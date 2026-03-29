@@ -2,17 +2,46 @@ import axios from 'axios'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
+console.log('🔌 API Base URL:', API_BASE_URL)
+
 const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 35000, // 35 second timeout
 })
+
+// Add request interceptor for better error messages
+api.interceptors.request.use(
+  (config) => {
+    console.log('📤 API Request:', config.method.toUpperCase(), config.url)
+    return config
+  },
+  (error) => {
+    console.error('❌ Request Error:', error)
+    return Promise.reject(error)
+  }
+)
+
+// Add response interceptor for better error messages
+api.interceptors.response.use(
+  (response) => {
+    console.log('✅ API Response:', response.status, response.data)
+    return response
+  },
+  (error) => {
+    console.error('❌ Response Error:', error.response?.status, error.response?.data || error.message)
+    return Promise.reject(error)
+  }
+)
 
 export const chatAPI = {
   // Send a message and get AI response
   sendMessage: async (userId, message, personality = null) => {
     try {
+      console.log('💬 Sending message from user:', userId)
+      
       const response = await api.post('/chat', {
         user_id: userId,
         message: message,
@@ -22,10 +51,30 @@ export const chatAPI = {
           response_style: 'Medium',
         },
       })
+      
+      if (!response.data?.response) {
+        throw new Error('Invalid response format from server')
+      }
+      
       return response.data
     } catch (error) {
-      console.error('Error sending message:', error)
-      throw error
+      console.error('💥 Error sending message:', error)
+      
+      let errorMessage = 'Failed to send message'
+      
+      if (error.response?.status === 400) {
+        errorMessage = 'Invalid message. Please try again.'
+      } else if (error.response?.status === 500) {
+        errorMessage = 'Server error: ' + (error.response.data?.detail || 'Unknown error')
+      } else if (error.code === 'ECONNABORTED') {
+        errorMessage = 'Request timeout. Backend might be slow or offline.'
+      } else if (error.message === 'Network Error') {
+        errorMessage = 'Network error. Check your connection or backend URL.'
+      } else if (error.response?.status === 0) {
+        errorMessage = 'Cannot connect to backend. Make sure API is running on ' + API_BASE_URL
+      }
+      
+      throw new Error(errorMessage)
     }
   },
 
@@ -36,7 +85,7 @@ export const chatAPI = {
       return response.data.messages || []
     } catch (error) {
       console.error('Error fetching history:', error)
-      throw error
+      return [] // Return empty array on error
     }
   },
 

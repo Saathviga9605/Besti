@@ -1,18 +1,32 @@
 import os
+import logging
 from openai import OpenAI
 from models import PersonalityConfig, Message
 from typing import List
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class LLMService:
     """Service for handling OpenAI API interactions"""
     
     def __init__(self):
-        self.client = OpenAI(
-    api_key=os.getenv("GROQ_API_KEY"),
-    base_url="https://api.groq.com/openai/v1"
-)
-        self.model = "llama-3.3-70b-versatile"      # high quality
+        api_key = os.getenv("GROQ_API_KEY") or os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            logger.warning("No API key found in environment variables")
+        
+        try:
+            self.client = OpenAI(
+                api_key=api_key,
+                base_url="https://api.groq.com/openai/v1" if os.getenv("GROQ_API_KEY") else None
+            )
+            self.model = "llama-3.3-70b-versatile" if os.getenv("GROQ_API_KEY") else "gpt-4-turbo-preview"
+            logger.info(f"LLM Service initialized with model: {self.model}")
+        except Exception as e:
+            logger.error(f"Error initializing LLM service: {e}")
+            raise
 
     
     def build_system_prompt(self, personality: PersonalityConfig, ai_name: str = "Luna") -> str:
@@ -68,33 +82,46 @@ Remember: You're their best friend, not their therapist or assistant. Just be pr
     def chat(self, user_message: str, history: List[Message], personality: PersonalityConfig, ai_name: str = "Luna") -> str:
         """Get AI response using OpenAI API with conversation history"""
         
-        system_prompt = self.build_system_prompt(personality, ai_name)
-        
-        # Build conversation history for OpenAI
-        messages = [{"role": "system", "content": system_prompt}]
-        
-        # Add previous messages (limit to last 20 to avoid token limits)
-        for msg in history[-20:]:
+        try:
+            system_prompt = self.build_system_prompt(personality, ai_name)
+            logger.info(f"Building prompt for AI: {ai_name}")
+            
+            # Build conversation history for OpenAI
+            messages = [{"role": "system", "content": system_prompt}]
+            
+            # Add previous messages (limit to last 20 to avoid token limits)
+            for msg in history[-20:]:
+                messages.append({
+                    "role": msg.role,
+                    "content": msg.content
+                })
+            
+            # Add current user message
             messages.append({
-                "role": msg.role,
-                "content": msg.content
+                "role": "user",
+                "content": user_message
             })
-        
-        # Add current user message
-        messages.append({
-            "role": "user",
-            "content": user_message
-        })
-        
-        # Call OpenAI API
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=0.8,  # Slightly higher for personality
-            max_tokens=300,
-        )
-        
-        return response.choices[0].message.content
+            
+            logger.info(f"Calling LLM API with {len(messages)} messages")
+            
+            # Call OpenAI API with timeout
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=0.8,  # Slightly higher for personality
+                max_tokens=300,
+                timeout=30,  # 30 second timeout
+            )
+            
+            ai_response = response.choices[0].message.content
+            logger.info(f"Received response from LLM (length: {len(ai_response)})")
+            
+            return ai_response
+            
+        except Exception as e:
+            error_msg = f"Error calling LLM: {str(e)}"
+            logger.error(error_msg)
+            raise Exception(error_msg)
 
 
 # Global instance
