@@ -1,117 +1,104 @@
 import React, { useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 
 const ChatMessage = ({ message, isUser, aiName, timestamp }) => {
   const [reactions, setReactions] = useState({})
   const [showReactions, setShowReactions] = useState(false)
 
-  const reactionEmojis = ['❤️', '😂', '😢', '🔥', '👏', '✨']
+  const reactionEmojis = ['❤️', '😂', '😢', '🔥', '👀']
 
-  const toggleReaction = (emoji) => {
+  const addReaction = (emoji) => {
     setReactions((prev) => ({
       ...prev,
-      [emoji]: !prev[emoji],
+      [emoji]: (prev[emoji] || 0) + 1,
     }))
   }
 
-  const hasReactions = Object.values(reactions).some(Boolean)
-
-  const formatTime = (ts) => {
-    if (!ts) return ''
-    const date = new Date(ts)
-    return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+  const formatTime = () => {
+    const now = new Date()
+    return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
   }
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3 }}
-      className={`flex gap-3 mb-6 message-enter ${isUser ? 'justify-end' : 'justify-start'}`}
+      initial={{ opacity: 0, ...( isUser ? { x: 20 } : { x: -20 })}}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ type: 'spring', damping: 14, stiffness: 200 }}
+      className={`flex gap-3 mb-6 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
       onHoverStart={() => !isUser && setShowReactions(true)}
-      onHoverEnd={() => setShowReactions(false)}
+      onHoverEnd={() => !isUser && setShowReactions(false)}
     >
-      {!isUser && (
-        <div className="flex-shrink-0">
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 via-pink-400 to-purple-500 flex items-center justify-center text-white text-sm font-bold shadow-md"
-          >
-            {aiName[0].toUpperCase()}
-          </motion.div>
-        </div>
-      )}
+      {/* Avatar */}
+      <motion.div
+        whileHover={{ scale: 1.08 }}
+        className={`${isUser ? 'avatar-user' : 'avatar-ai'} flex-shrink-0 relative`}
+      >
+        {isUser ? '🧑' : aiName.charAt(0)}
+      </motion.div>
 
-      <div className={`max-w-xs lg:max-w-md flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
-        {/* Message bubble */}
+      {/* Message Container */}
+      <div className={`flex flex-col gap-2 ${isUser ? 'items-end' : 'items-start'} max-w-sm`}>
+        {/* Bubble */}
         <motion.div
-          whileHover={{ scale: 1.02 }}
-          className={`px-4 py-3 rounded-2xl ${
-            isUser
-              ? 'bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-br-none shadow-lg'
-              : 'glass text-gray-800 rounded-bl-none'
-          }`}
+          whileHover={!isUser ? { scale: 1.02 } : {}}
+          className={`${isUser ? 'bubble-user' : 'bubble-ai'}`}
         >
-          <p className="text-sm leading-relaxed break-words">{message}</p>
+          {message}
         </motion.div>
 
-        {/* Reactions */}
-        {hasReactions && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="flex gap-1 mt-2 px-2"
-          >
-            {reactionEmojis.map(
-              (emoji) =>
-                reactions[emoji] && (
-                  <span
+        {/* Reactions & Timestamp Row */}
+        <div className={`flex gap-3 items-center px-2 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
+          {/* Timestamp */}
+          <span className="text-xs font-ui text-text-ghost whitespace-nowrap">
+            {formatTime()}
+          </span>
+
+          {/* Reactions Display or Picker */}
+          <AnimatePresence mode="wait">
+            {showReactions && !isUser ? (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8, y: 8 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.8, y: 8 }}
+                transition={{ type: 'spring', damping: 12, stiffness: 200 }}
+                className="reactions-container"
+              >
+                {reactionEmojis.map((emoji) => (
+                  <motion.button
                     key={emoji}
-                    className="text-lg cursor-pointer transition-transform hover:scale-125"
+                    whileHover={{ scale: 1.25 }}
+                    whileTap={{ scale: 0.9 }}
+                    onClick={() => addReaction(emoji)}
+                    className="reaction-btn"
+                    type="button"
                   >
                     {emoji}
-                  </span>
-                )
-            )}
-          </motion.div>
-        )}
-
-        {/* Timestamp and reactions */}
-        <div className="flex gap-2 items-center mt-1 px-1">
-          <span className="text-xs text-gray-400">{formatTime(timestamp)}</span>
-
-          {showReactions && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex gap-1 bg-white rounded-full p-2 shadow-md border border-gray-200"
-            >
-              {reactionEmojis.map((emoji) => (
-                <button
-                  key={emoji}
-                  onClick={() => toggleReaction(emoji)}
-                  className={`text-lg transition-all hover:scale-125 ${
-                    reactions[emoji] ? 'scale-125' : 'hover:opacity-80'
-                  }`}
-                >
-                  {emoji}
-                </button>
-              ))}
-            </motion.div>
-          )}
+                  </motion.button>
+                ))}
+              </motion.div>
+            ) : Object.keys(reactions).length > 0 ? (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex gap-1"
+              >
+                {reactionEmojis.map(
+                  (emoji) =>
+                    reactions[emoji] && (
+                      <motion.span
+                        key={emoji}
+                        whileHover={{ scale: 1.15 }}
+                        className="text-sm bg-white/10 backdrop-blur px-2 py-1 rounded-full cursor-pointer hover:bg-white/20 transition-colors"
+                      >
+                        {emoji} {reactions[emoji]}
+                      </motion.span>
+                    )
+                )}
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
         </div>
       </div>
-
-      {isUser && (
-        <div className="flex-shrink-0 mt-1">
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center text-white text-xs font-bold shadow-md"
-          >
-            🧑
-          </motion.div>
-        </div>
-      )}
     </motion.div>
   )
 }

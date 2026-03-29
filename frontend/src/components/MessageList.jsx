@@ -1,92 +1,100 @@
 import React, { useEffect, useRef } from 'react'
 import ChatMessage from './ChatMessage'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 
 const MessageList = ({ messages, aiName, isLoading, error }) => {
   const endRef = useRef(null)
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' })
+    setTimeout(() => {
+      endRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }, 0)
   }, [messages, isLoading])
 
-  const getMessageTime = (index) => {
-    return new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
-  }
-
   return (
-    <div className="flex-1 overflow-y-auto p-6 space-y-1 messages-container">
+    <div className="flex-1 overflow-y-auto flex flex-col p-8 space-y-2">
       {messages.length === 0 ? (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.2 }}
-          className="flex items-center justify-center h-full"
+          transition={{ delay: 0.3 }}
+          className="flex flex-col items-center justify-center flex-1 text-center"
         >
-          <div className="text-center max-w-sm">
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 3, repeat: Infinity }}
-              className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center mx-auto mb-6 shadow-premium text-4xl"
-            >
-              ✨
-            </motion.div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">
-              Hey! I'm {aiName}
-            </h2>
-            <p className="text-gray-600 text-sm leading-relaxed">
-              Your AI best friend is ready to chat, support, and celebrate with you. What's on your mind today?
-            </p>
-          </div>
+          <motion.div
+            animate={{ y: [0, -8, 0] }}
+            transition={{ duration: 2, repeat: Infinity }}
+            className="text-7xl mb-8"
+          >
+            ✨
+          </motion.div>
+          <h2 className="font-display text-3xl text-white mb-3">
+            {aiName} is waiting for you
+          </h2>
+          <p className="text-text-ghost max-w-sm text-lg leading-relaxed">
+            Begin whenever you're ready. Everything you share here is treated with care.
+          </p>
         </motion.div>
       ) : (
         <>
-          {messages.map((msg, idx) => (
-            <ChatMessage
-              key={idx}
-              message={msg.content}
-              isUser={msg.role === 'user'}
-              aiName={aiName}
-              timestamp={getMessageTime(idx)}
-            />
-          ))}
+          <AnimatePresence mode="popLayout">
+            {messages.map((msg, idx) => (
+              <motion.div
+                key={idx}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              >
+                <ChatMessage
+                  message={msg.content}
+                  isUser={msg.role === 'user'}
+                  aiName={aiName}
+                  timestamp={new Date()}
+                />
+              </motion.div>
+            ))}
+          </AnimatePresence>
 
           {/* Error message */}
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="my-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg"
-            >
-              <p className="text-red-700 text-sm font-medium">
-                ⚠️ {error}
-              </p>
-            </motion.div>
-          )}
+          <AnimatePresence>
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: 12, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -12, scale: 0.95 }}
+                className="my-6 px-5 py-4 glass-card border-l-4 border-red-500 rounded-lg"
+              >
+                <p className="text-red-300 text-sm font-ui leading-relaxed">
+                  <span className="mr-2">⚠️</span>
+                  {error}
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          {/* Typing indicator */}
-          {isLoading && (
-            <motion.div
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex gap-3 mb-4"
-            >
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center text-white text-sm font-bold shadow-md">
-                  {aiName[0]}
+          {/* Typing indicator - The Heartbeat */}
+          <AnimatePresence>
+            {isLoading && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                className="flex gap-3 mt-6"
+              >
+                <motion.div className="avatar-ai">
+                  {aiName.charAt(0)}
+                </motion.div>
+                <div className="flex flex-col gap-1">
+                  <div className="typing-indicator">
+                    <span className="typing-dot"></span>
+                    <span className="typing-dot"></span>
+                    <span className="typing-dot"></span>
+                    <span className="typing-label">{aiName} is thinking…</span>
+                  </div>
                 </div>
-              </div>
-              <div className="glass px-4 py-3 rounded-2xl rounded-bl-none flex items-center gap-1">
-                <span className="text-xs text-gray-500 font-medium">thinking</span>
-                <div className="typing">
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </div>
-              </div>
-            </motion.div>
-          )}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          <div ref={endRef} className="pt-4" />
+          <div ref={endRef} className="pt-6" />
         </>
       )}
     </div>

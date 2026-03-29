@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
 import { chatAPI } from './services/api'
 import Sidebar from './components/Sidebar'
 import MessageList from './components/MessageList'
@@ -14,7 +13,7 @@ function App() {
   const [error, setError] = useState(null)
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [preferences, setPreferences] = useState({
-    ai_name: 'Luna',
+    ai_name: 'Elio',
     personality: {
       tone: 'Caring',
       energy: 'Chill',
@@ -37,73 +36,65 @@ function App() {
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        console.log('Loading initial data for user:', userId)
-
-        // Load preferences
         const prefs = await chatAPI.getPreferences(userId)
-        console.log('Loaded preferences:', prefs)
         setPreferences(prefs)
 
-        // Load chat history
         const history = await chatAPI.getHistory(userId)
-        console.log('Loaded chat history:', history)
 
         if (history && history.length > 0) {
-          // Create default chat with existing messages
           const defaultChat = {
             id: 'default',
-            name: 'Previous Conversation',
-            preview: history[history.length - 1]?.content?.substring(0, 40) + '...' || 'Continue chatting...',
+            name: 'Continue',
+            preview: history[history.length - 1]?.content?.substring(0, 40) + '...' || 'Open to chat...',
             messages: history,
           }
           setChatHistories([defaultChat])
           setCurrentChat(defaultChat)
           setCurrentMessages(history)
-        } else {
-          console.log('No previous history found')
         }
       } catch (error) {
         console.error('Error loading initial data:', error)
-        setError('Failed to load previous data')
       }
     }
 
     loadInitialData()
   }, [userId])
 
+  // Pulse glow on message
+  const pulseGlow = () => {
+    const voidBg = document.querySelector('.void-bg')
+    if (voidBg) {
+      voidBg.classList.remove('pulse-message')
+      // Trigger reflow to restart animation
+      void voidBg.offsetWidth
+      voidBg.classList.add('pulse-message')
+    }
+  }
+
   // Handle sending a message
   const handleSendMessage = async (message) => {
     if (!message.trim()) return
 
-    setError(null) // Clear previous errors
+    setError(null)
+    pulseGlow()
 
-    console.log('Sending message:', message)
-
-    // Add user message to current chat
     const newMessages = [...currentMessages, { role: 'user', content: message }]
     setCurrentMessages(newMessages)
     setIsLoading(true)
 
     try {
-      console.log('Calling chat API...')
-
-      // Send message to backend
       const response = await chatAPI.sendMessage(userId, message, preferences.personality)
-
-      console.log('Received response:', response)
 
       if (!response.response) {
         throw new Error('Empty response from AI')
       }
 
-      // Add AI response
       const messagesWithResponse = [
         ...newMessages,
         { role: 'assistant', content: response.response },
       ]
       setCurrentMessages(messagesWithResponse)
 
-      // Update chat history in sidebar
       if (currentChat) {
         const updatedChat = {
           ...currentChat,
@@ -119,11 +110,8 @@ function App() {
       }
     } catch (error) {
       console.error('Error sending message:', error)
-
       const errorMessage = error.message || 'Failed to get response from AI'
       setError(errorMessage)
-
-      // Remove the last user message if there's an error
       setCurrentMessages(newMessages.slice(0, -1))
     } finally {
       setIsLoading(false)
@@ -134,8 +122,8 @@ function App() {
   const handleNewChat = () => {
     const newChat = {
       id: `chat_${Date.now()}`,
-      name: `Chat ${new Date().toLocaleDateString()}`,
-      preview: 'New conversation',
+      name: `${new Date().toLocaleDateString()}`,
+      preview: 'Just now',
       messages: [],
     }
     setChatHistories([newChat, ...chatHistories])
@@ -154,11 +142,9 @@ function App() {
   // Handle settings save
   const handleSavePreferences = async (newPrefs) => {
     try {
-      console.log('Saving preferences:', newPrefs)
       await chatAPI.setPreferences(userId, newPrefs.ai_name, newPrefs.personality)
       setPreferences(newPrefs)
       setIsSettingsOpen(false)
-      console.log('Preferences saved successfully')
     } catch (error) {
       console.error('Error saving preferences:', error)
       setError('Failed to save preferences')
@@ -166,56 +152,69 @@ function App() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gradient-to-br from-purple-50 via-white to-pink-50">
-      {/* Sidebar */}
-      <Sidebar
-        chatHistories={chatHistories}
-        onNewChat={handleNewChat}
-        onSelectChat={handleSelectChat}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-        currentChatId={currentChat?.id}
-      />
+    <div className="relative w-screen h-screen overflow-hidden">
+      {/* The Void - Living Canvas */}
+      <div className="void-bg">
+        <div className="blob blob-1"></div>
+        <div className="blob blob-2"></div>
+        <div className="blob blob-3"></div>
+        <div className="blob blob-4"></div>
+        <div className="chat-glow"></div>
+      </div>
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Chat Header */}
-        <motion.div className="bg-white/80 backdrop-blur-lg border-b border-white/20 px-6 py-4 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <motion.h2
-                key={preferences.ai_name}
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-2xl font-bold text-gray-800"
-              >
-                {preferences.ai_name}
-              </motion.h2>
-              <motion.p className="text-xs text-gray-500 font-medium mt-1">
-                {isLoading ? '💭 thinking...' : '🟢 online'}
-              </motion.p>
-            </div>
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setIsSettingsOpen(true)}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-all"
-              title="Customize AI"
-            >
-              ⚙️
-            </motion.button>
-          </div>
-        </motion.div>
+      {/* Layout Container */}
+      <div className="absolute inset-0 z-10 flex w-full h-full">
+        {/* Sidebar - The Archive */}
+        <Sidebar
+          chatHistories={chatHistories}
+          onNewChat={handleNewChat}
+          onSelectChat={handleSelectChat}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+          currentChatId={currentChat?.id}
+        />
 
-        {/* Message Area */}
-        <div className="flex-1 overflow-hidden flex flex-col">
+        {/* Main Chat Panel - Floating Glass */}
+        <div className="flex-1 flex flex-col m-8 rounded-3xl glass shadow-panel overflow-hidden">
           {currentChat ? (
             <>
+              {/* Header - The Presence */}
+              <div className="px-8 py-6 border-b border-white/10">
+                <div className="flex items-end justify-between gap-4">
+                  <div className="flex items-center gap-4">
+                    {/* Avatar - Rotating Ring */}
+                    <div className="avatar-ai">
+                      {preferences.ai_name.charAt(0)}
+                    </div>
+                    <div>
+                      <h1 className="font-display text-3xl text-white leading-tight">
+                        {preferences.ai_name}
+                      </h1>
+                      <div className="tag-bar mt-1">
+                        <span className="tag">{preferences.personality.tone}</span>
+                        <span className="tag">{preferences.personality.energy}</span>
+                        <span className="tag">{preferences.personality.response_style}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Status */}
+                  <div className="text-right">
+                    <p className="text-xs font-ui text-text-ghost">
+                      {isLoading ? '💭 thinking' : '🟢 awaiting'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Message Stream */}
               <MessageList
                 messages={currentMessages}
                 aiName={preferences.ai_name}
                 isLoading={isLoading}
                 error={error}
               />
+
+              {/* Input Footer */}
               <ChatInput
                 onSendMessage={handleSendMessage}
                 isLoading={isLoading}
@@ -223,33 +222,29 @@ function App() {
               />
             </>
           ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex items-center justify-center h-full"
-            >
-              <div className="text-center max-w-sm">
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 3, repeat: Infinity }}
-                  className="w-24 h-24 rounded-full bg-gradient-to-br from-purple-400 to-pink-400 flex items-center justify-center mx-auto mb-6 shadow-premium text-5xl"
-                >
-                  💬
-                </motion.div>
-                <h1 className="text-4xl font-bold text-gray-800 mb-3">Welcome to Besti</h1>
-                <p className="text-gray-600 text-sm mb-6 leading-relaxed">
-                  Your AI best friend is ready. Start a conversation and let's connect.
+            // Empty State - The Welcome
+            <div className="flex-1 flex flex-col items-center justify-center px-8 text-center">
+              <div className="mb-8">
+                <div className="text-8xl mb-6 animate-pulse">
+                  ✨
+                </div>
+                <h1 className="font-display text-5xl text-white mb-3">
+                  Welcome to Besti
+                </h1>
+                <p className="text-text-ghost text-lg max-w-md mx-auto">
+                  A living presence. Someone waiting for you. Begin whenever you're ready.
                 </p>
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={handleNewChat}
-                  className="px-8 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full font-semibold hover:shadow-lg shadow-purple-500/50 transition-all"
-                >
-                  Start Chatting + New Chat
-                </motion.button>
               </div>
-            </motion.div>
+              <button
+                onClick={handleNewChat}
+                className="px-8 py-4 rounded-full background: linear-gradient(135deg, #7c3aed, #ec4899) text-white font-ui-bold transition-all hover:scale-105 active:scale-95"
+                style={{
+                  background: 'linear-gradient(135deg, #7c3aed, #ec4899)',
+                }}
+              >
+                Start a Conversation
+              </button>
+            </div>
           )}
         </div>
       </div>
