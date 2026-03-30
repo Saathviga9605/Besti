@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Union
 
 
 class PersonalityConfig(BaseModel):
@@ -17,7 +17,7 @@ class Message(BaseModel):
 
 class ChatRequest(BaseModel):
     """Request body for chat endpoint"""
-    user_id: str
+    user_id: Union[int, str]  # Accept both int and str
     message: str
     personality: Optional[PersonalityConfig] = None
 

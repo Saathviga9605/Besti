@@ -5,9 +5,21 @@ import Sidebar from './components/Sidebar'
 import MessageList from './components/MessageList'
 import ChatInput from './components/ChatInput'
 import PersonalityModal from './components/PersonalityModal'
+import LoginPage from './pages/LoginPage'
+import SignupPage from './pages/SignupPage'
 
 function App() {
-  // Zustand state
+  // Zustand state - Authentication
+  const {
+    authToken,
+    userId,
+    username,
+    isAuthenticated,
+    setAuth,
+    logout,
+  } = useStore()
+
+  // Zustand state - Chat
   const {
     sidebarExpanded,
     toggleSidebar,
@@ -24,9 +36,11 @@ function App() {
     setSettingsOpen,
   } = useStore()
 
-  // Local state for current chat view
+  // Local state
   const [currentMessages, setCurrentMessages] = useState([])
   const [error, setError] = useState(null)
+  const [authPage, setAuthPage] = useState('login') // 'login' or 'signup'
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const [preferences, setPreferences] = useState({
     ai_name: 'Elio',
     personality: {
@@ -36,22 +50,34 @@ function App() {
     },
   })
 
+  // Check authentication on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const token = localStorage.getItem('authToken')
+        const storedUserId = localStorage.getItem('userId')
+        const storedUsername = localStorage.getItem('username')
+
+        if (token && storedUserId && storedUsername) {
+          setAuth(token, parseInt(storedUserId), storedUsername)
+        }
+      } catch (error) {
+        console.error('Error checking auth:', error)
+      } finally {
+        setIsCheckingAuth(false)
+      }
+    }
+
+    checkAuth()
+  }, [])
+
   // Get current chat from Zustand conversations
   const currentChat = conversations.find(c => c.id === activeConversationId)
 
-  // Generate unique user ID (persisted in localStorage)
-  const userId = (() => {
-    let id = localStorage.getItem('besti_user_id')
-    if (!id) {
-      id = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-      localStorage.setItem('besti_user_id', id)
-      console.log('Generated new user ID:', id)
-    }
-    return id
-  })()
-
-  // Load preferences and chat history on mount
+  // Load preferences and chat history on mount (when authenticated)
   useEffect(() => {
+    if (!isAuthenticated || !userId) return
+
     const loadInitialData = async () => {
       try {
         const prefs = await chatAPI.getPreferences(userId)
@@ -76,7 +102,7 @@ function App() {
     }
 
     loadInitialData()
-  }, [userId])
+  }, [isAuthenticated, userId])
 
   // Pulse glow on message
   const pulseGlow = () => {
@@ -91,7 +117,7 @@ function App() {
 
   // Handle sending a message
   const handleSendMessage = async (message) => {
-    if (!message.trim()) return
+    if (!message.trim() || !userId) return
 
     setError(null)
     pulseGlow()
@@ -160,7 +186,9 @@ function App() {
   // Handle settings save
   const handleSavePreferences = async (newPrefs) => {
     try {
-      await chatAPI.setPreferences(userId, newPrefs.ai_name, newPrefs.personality)
+      if (userId) {
+        await chatAPI.setPreferences(userId, newPrefs.ai_name, newPrefs.personality)
+      }
       setPreferences(newPrefs)
       setSettingsOpen(false)
     } catch (error) {
@@ -169,6 +197,43 @@ function App() {
     }
   }
 
+  // Handle logout
+  const handleLogout = () => {
+    localStorage.removeItem('authToken')
+    localStorage.removeItem('userId')
+    localStorage.removeItem('username')
+    logout()
+    setAuthPage('login')
+  }
+
+  // Show loading state while checking auth
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-4xl mb-4 animate-pulse">✨</div>
+          <p className="text-white/70">Connecting...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show authentication pages if not authenticated
+  if (!isAuthenticated) {
+    return authPage === 'login' ? (
+      <LoginPage
+        onSwitchToSignup={() => setAuthPage('signup')}
+        onLoginSuccess={() => setAuthPage('login')} // Stays on login, but isAuthenticated changes
+      />
+    ) : (
+      <SignupPage
+        onSwitchToLogin={() => setAuthPage('login')}
+        onSignupSuccess={() => setAuthPage('login')} // Goes to login after signup
+      />
+    )
+  }
+
+  // Show chat interface if authenticated
   return (
     <div className="app-shell">
       {/* Background Canvas */}
@@ -187,6 +252,8 @@ function App() {
         onNewChat={handleNewChat}
         onSelectChat={handleSelectChat}
         onOpenSettings={() => setSettingsOpen(true)}
+        username={username}
+        onLogout={handleLogout}
       />
 
       {/* Chat Shell - The Stage */}

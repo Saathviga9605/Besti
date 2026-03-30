@@ -1,6 +1,31 @@
 import { create } from 'zustand'
 
 const useStore = create((set) => ({
+  /* ===== AUTHENTICATION ===== */
+  userId: null,
+  authToken: null,
+  username: null,
+  isAuthenticated: false,
+  
+  setAuth: (token, userId, username) =>
+    set({
+      authToken: token,
+      userId,
+      username,
+      isAuthenticated: true,
+    }),
+  
+  logout: () =>
+    set({
+      authToken: null,
+      userId: null,
+      username: null,
+      isAuthenticated: false,
+      conversations: [],
+      messages: {},
+      activeConversationId: null,
+    }),
+
   /* ===== SIDEBAR ===== */
   sidebarExpanded: true,
   toggleSidebar: () => set((state) => ({ sidebarExpanded: !state.sidebarExpanded })),

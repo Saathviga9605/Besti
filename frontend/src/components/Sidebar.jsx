@@ -2,7 +2,7 @@ import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import useStore from '../store/useStore'
 
-const Sidebar = ({ conversations, activeConversationId, onNewChat, onSelectChat, onOpenSettings }) => {
+const Sidebar = ({ conversations, activeConversationId, onNewChat, onSelectChat, onOpenSettings, username, onLogout }) => {
   const { sidebarExpanded, toggleSidebar } = useStore()
   const streak = localStorage.getItem('besti_streak') || '0'
 
@@ -96,6 +96,23 @@ const Sidebar = ({ conversations, activeConversationId, onNewChat, onSelectChat,
           <span className="chat-card-name">Customize</span>
         </div>
       </motion.button>
+
+      {/* User Profile & Logout */}
+      {username && (
+        <motion.div className="mx-4 mb-4 p-3 rounded-lg bg-white/5 border border-white/10">
+          <p className="text-xs text-text-ghost mb-2">Logged in as</p>
+          <p className="text-sm text-white font-semibold mb-3 truncate">{username}</p>
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={onLogout}
+            className="w-full px-3 py-2 text-xs bg-red-500/10 hover:bg-red-500/20 text-red-300 rounded-md border border-red-500/30 transition"
+            type="button"
+          >
+            Sign Out
+          </motion.button>
+        </motion.div>
+      )}
     </motion.div>
   )
 }

@@ -107,8 +107,8 @@ export const chatAPI = {
         params: {
           user_id: userId,
           ai_name: aiName,
+          personality: personality ? JSON.stringify(personality) : null,
         },
-        data: personality,
       })
       return response.data
     } catch (error) {
