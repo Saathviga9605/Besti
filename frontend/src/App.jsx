@@ -5,8 +5,10 @@ import Sidebar from './components/Sidebar'
 import MessageList from './components/MessageList'
 import ChatInput from './components/ChatInput'
 import PersonalityModal from './components/PersonalityModal'
+import CharacterEditor from './components/CharacterEditor'
 import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
+import CharacterCreator from './pages/CharacterCreator'
 
 function App() {
   // Zustand state - Authentication
