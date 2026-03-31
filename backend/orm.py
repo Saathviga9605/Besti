@@ -90,56 +90,30 @@ class Personality(Base):
 
 
 class Avatar(Base):
-    """Avatar customization model - complete character definition"""
+    """Avatar customization model"""
     __tablename__ = "avatars"
     
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
     
-    # ==================== IDENTITY ====================
-    ai_name = Column(String(50), default="Echo")
-    gender = Column(String(50), default="non-binary")  # male, female, non-binary, custom
-    age_range = Column(Integer, default=25)  # slider 18-50
-    pronouns = Column(String(50), default="they/them")  # they/them, she/her, he/him, custom
+    # Avatar image
+    image_type = Column(String(50), default="generated")  # "uploaded" or "generated"
+    image_url = Column(String(500), nullable=True)
     
-    # ==================== PHYSICAL APPEARANCE - FACE ====================
-    face_shape = Column(String(50), default="oval")  # round, sharp, oval
-    skin_tone = Column(String(7), default="#fdbcb4")  # hex color
-    eye_type = Column(String(50), default="soft")  # sharp, soft, sleepy, expressive
-    eye_color = Column(String(7), default="#8b7355")  # hex color
-    eyebrow_style = Column(String(50), default="natural")  # natural, bold, thin, arched
+    # Color customization
+    primary_color = Column(String(7), default="#06040f")  # hex color
+    secondary_color = Column(String(7), default="#7c3aed")
+    accent_color = Column(String(7), default="#a855f7")
     
-    # ==================== PHYSICAL APPEARANCE - HAIR ====================
-    hair_style = Column(String(50), default="long")  # short, medium, long, curly, straight, messy
-    hair_color = Column(String(7), default="#2c2416")  # hex color
-    
-    # ==================== PHYSICAL APPEARANCE - BODY ====================
-    height = Column(Integer, default=50)  # 0-100 slider (short to tall)
-    build = Column(String(50), default="average")  # slim, average, athletic, curvy
-    
-    # ==================== STYLE ====================
-    outfit_vibe = Column(String(50), default="casual")  # casual, streetwear, soft, formal, dark_academia
-    
-    # ==================== ACCESSORIES ====================
-    has_glasses = Column(Boolean, default=False)
-    glasses_style = Column(String(50), nullable=True)  # cat-eye, round, rectangle, none
-    has_piercings = Column(Boolean, default=False)
-    piercing_count = Column(Integer, default=0)  # number of piercings
-    has_jewelry = Column(Boolean, default=False)
-    jewelry_type = Column(String(100), nullable=True)  # comma-separated: necklace, rings, bracelets
-    
-    # ==================== VISUAL PERSONALITY LINK ====================
-    # These reflect personality traits in visual form
-    glow_color = Column(String(7), default="#a855f7")  # aurora glow
+    # Animation style
+    glow_style = Column(String(50), default="aurora")  # "aurora", "neon", "soft", "none"
     glow_intensity = Column(Integer, default=70)  # 0-100
-    color_warmth = Column(Integer, default=50)  # 0-100 (cool to warm)
-    expression_tendency = Column(String(50), default="neutral")  # soft, neutral, intense, playful
     
-    # ==================== AVATAR GENERATION ====================
-    avatar_url = Column(String(500), nullable=True)  # Generated avatar image URL
-    avatar_config = Column(String(2000), nullable=True)  # JSON config for avatar generation
+    # Appearance settings
+    bubble_style = Column(String(50), default="glass")  # "glass", "solid", "minimal"
+    font_style = Column(String(50), default="serif")    # "serif", "sans", "monospace"
+    theme = Column(String(50), default="dark")          # "dark", "light", "void"
     
-    # ==================== METADATA ====================
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     

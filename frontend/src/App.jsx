@@ -5,10 +5,8 @@ import Sidebar from './components/Sidebar'
 import MessageList from './components/MessageList'
 import ChatInput from './components/ChatInput'
 import PersonalityModal from './components/PersonalityModal'
-import CharacterEditor from './components/CharacterEditor'
 import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
-import CharacterCreator from './pages/CharacterCreator'
 
 function App() {
   // Zustand state - Authentication
@@ -43,9 +41,6 @@ function App() {
   const [error, setError] = useState(null)
   const [authPage, setAuthPage] = useState('login') // 'login' or 'signup'
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
-  const [character, setCharacter] = useState(null)
-  const [characterEditorOpen, setCharacterEditorOpen] = useState(false)
-  const [isLoadingCharacter, setIsLoadingCharacter] = useState(false)
   const [preferences, setPreferences] = useState({
     ai_name: 'Elio',
     personality: {
@@ -78,43 +73,6 @@ function App() {
 
   // Get current chat from Zustand conversations
   const currentChat = conversations.find(c => c.id === activeConversationId)
-
-  // Load character data when authenticated
-  useEffect(() => {
-    if (!isAuthenticated || !userId || !authToken) return
-
-    const loadCharacter = async () => {
-      try {
-        setIsLoadingCharacter(true)
-        const response = await fetch(`http://localhost:8000/characters/${userId}`, {
-          headers: {
-            Authorization: `Bearer ${authToken}`,
-          },
-        })
-
-        if (response.ok) {
-          const characterData = await response.json()
-          setCharacter(characterData)
-          // Update preferences with AI name from character
-          if (characterData.ai_name) {
-            setPreferences((prev) => ({
-              ...prev,
-              ai_name: characterData.ai_name,
-            }))
-          }
-        } else if (response.status === 404) {
-          // No character created yet
-          setCharacter(null)
-        }
-      } catch (error) {
-        console.error('Error loading character:', error)
-      } finally {
-        setIsLoadingCharacter(false)
-      }
-    }
-
-    loadCharacter()
-  }, [isAuthenticated, userId, authToken])
 
   // Load preferences and chat history on mount (when authenticated)
   useEffect(() => {
@@ -239,24 +197,6 @@ function App() {
     }
   }
 
-  // Handle character creation
-  const handleCharacterCreated = (newCharacter) => {
-    setCharacter(newCharacter)
-    setPreferences((prev) => ({
-      ...prev,
-      ai_name: newCharacter.ai_name,
-    }))
-  }
-
-  // Handle character update
-  const handleCharacterUpdated = (updatedCharacter) => {
-    setCharacter(updatedCharacter)
-    setPreferences((prev) => ({
-      ...prev,
-      ai_name: updatedCharacter.ai_name,
-    }))
-  }
-
   // Handle logout
   const handleLogout = () => {
     localStorage.removeItem('authToken')
@@ -293,24 +233,7 @@ function App() {
     )
   }
 
-  // Show character creator if authenticated but no character exists
-  if (isAuthenticated && !isLoadingCharacter && !character) {
-    return <CharacterCreator onCharacterCreated={handleCharacterCreated} />
-  }
-
-  // Show loading state while fetching character
-  if (isAuthenticated && isLoadingCharacter) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-purple-950 to-slate-950 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-4xl mb-4 animate-pulse">✨</div>
-          <p className="text-white/70">Loading your companion...</p>
-        </div>
-      </div>
-    )
-  }
-
-  // Show chat interface if authenticated and character exists
+  // Show chat interface if authenticated
   return (
     <div className="app-shell">
       {/* Background Canvas */}
@@ -341,32 +264,9 @@ function App() {
             <div className="chat-header px-8 py-6 border-b border-white/10">
               <div className="flex items-end justify-between gap-4">
                 <div className="flex items-center gap-4">
-                  {/* Avatar with Live Glow */}
-                  <div 
-                    className="relative w-16 h-16 rounded-2xl border border-white/20 overflow-hidden cursor-pointer hover:border-white/40 transition group"
-                    onClick={() => setCharacterEditorOpen(true)}
-                    title="Click to edit character"
-                  >
-                    {/* Glow background */}
-                    <div
-                      className="absolute inset-0 opacity-30 blur-xl"
-                      style={{
-                        backgroundColor: character?.glow_color || '#a855f7',
-                        opacity: (character?.glow_intensity || 70) / 200,
-                      }}
-                    />
-                    {/* Avatar image */}
-                    {character?.avatar_url && (
-                      <img
-                        src={character.avatar_url}
-                        alt={character.ai_name}
-                        className="w-full h-full object-cover object-top group-hover:scale-110 transition-transform"
-                      />
-                    )}
-                    {/* Edit overlay */}
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                      <span className="text-white text-sm font-semibold">Edit</span>
-                    </div>
+                  {/* Avatar */}
+                  <div className="avatar-ai">
+                    {preferences.ai_name.charAt(0)}
                   </div>
                   <div>
                     <h1 className="font-display text-3xl text-white leading-tight">
@@ -437,14 +337,6 @@ function App() {
         onClose={() => setSettingsOpen(false)}
         onSave={handleSavePreferences}
         currentPreferences={preferences}
-      />
-
-      {/* Character Editor Modal */}
-      <CharacterEditor
-        character={character}
-        isOpen={characterEditorOpen}
-        onClose={() => setCharacterEditorOpen(false)}
-        onUpdate={handleCharacterUpdated}
       />
     </div>
   )
