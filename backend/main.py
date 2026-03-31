@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from models import ChatRequest, ChatResponse, Message, PersonalityConfig
 from services import llm_service
 from database import init_db, get_db, SessionLocal
-from orm import User, Avatar
+from orm import User, Avatar, ChatHistory
 from auth import hash_password, verify_password, create_access_token, verify_token
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -243,49 +243,101 @@ async def root():
 
 
 @app.post("/chat")
-async def chat(request: ChatRequest):
-    """Main chat endpoint"""
+async def chat(request: ChatRequest, db: Session = Depends(get_db)):
+    """Main chat endpoint - Database-backed with message editing and regeneration support"""
     
     try:
-        logger.info(f"Chat request from user: {request.user_id}")
+        logger.info(f"💬 Chat request from user: {request.user_id}")
         
-        # Convert user_id to string for consistent dict key handling
-        user_id = str(request.user_id)
+        # Convert user_id to int
+        user_id = int(request.user_id) if isinstance(request.user_id, str) else request.user_id
         user_message = request.message
         
         if not user_message or not user_message.strip():
-            logger.warning(f"Empty message from user: {user_id}")
+            logger.warning(f"❌ Empty message from user: {user_id}")
             raise HTTPException(status_code=400, detail="Message cannot be empty")
+        
+        # Verify user exists
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            logger.error(f"❌ User not found: {user_id}")
+            raise HTTPException(status_code=404, detail=f"User {user_id} not found")
         
         personality = request.personality or PersonalityConfig()
         
-        # Initialize chat history for user if not exists
-        if user_id not in chat_histories:
-            chat_histories[user_id] = []
-            logger.info(f"Created new chat history for user: {user_id}")
+        logger.info(f"✅ User verified: {user.username}")
         
-        # Get AI name from preferences (default: Luna)
-        ai_name = user_preferences.get(user_id, {}).get("ai_name", "Luna")
+        # Handle message editing/regeneration
+        if request.message_id is not None:
+            logger.info(f"📝 Editing/regenerating message {request.message_id} for user: {user_id}")
+            
+            # Delete all messages after the edit point to create new branch
+            db.query(ChatHistory)\
+                .filter(ChatHistory.user_id == user_id, ChatHistory.id > request.message_id)\
+                .delete()
+            db.commit()
+            logger.info(f"✅ Deleted messages after ID {request.message_id}")
         
-        # Add user message to history
-        chat_histories[user_id].append(Message(role="user", content=user_message))
-        logger.info(f"Added user message to history. History length: {len(chat_histories[user_id])}")
+        # Get recent chat history for context
+        logger.info(f"📖 Fetching chat history for user: {user_id}")
+        recent_chats = db.query(ChatHistory)\
+            .filter(ChatHistory.user_id == user_id)\
+            .order_by(ChatHistory.created_at.asc())\
+            .limit(10)\
+            .all()
+        
+        # Convert to Message format
+        history = [Message(role=chat.role, content=chat.message) for chat in recent_chats]
+        
+        # Add current user message to history
+        history.append(Message(role="user", content=user_message))
+        
+        # Get AI name from preferences
+        ai_name = user.username or "Assistant"
         
         # Get AI response
-        logger.info(f"Requesting AI response for user: {user_id}")
+        logger.info(f"🤖 Calling LLM for response")
         ai_response = llm_service.chat(
             user_message=user_message,
-            history=chat_histories[user_id],
+            history=history,
             personality=personality,
             ai_name=ai_name
         )
-        logger.info(f"Received AI response (length: {len(ai_response)})")
+        logger.info(f"✅ LLM response generated (length: {len(ai_response)})")
         
-        # Add AI response to history
-        chat_histories[user_id].append(Message(role="assistant", content=ai_response))
+        # Save user message to database
+        try:
+            user_chat_msg = ChatHistory(
+                user_id=user_id,
+                conversation_id="main",
+                role="user",
+                message=user_message
+            )
+            db.add(user_chat_msg)
+            db.flush()  # Get the message ID
+            user_message_id = user_chat_msg.id
+            
+            # Save AI response to database
+            ai_chat_msg = ChatHistory(
+                user_id=user_id,
+                conversation_id="main",
+                role="assistant",
+                message=ai_response
+            )
+            db.add(ai_chat_msg)
+            db.commit()
+            logger.info(f"✅ Messages saved to database (user_msg_id: {user_message_id})")
+        except Exception as e:
+            logger.error(f"⚠️ Error saving chat history: {e}")
+            db.rollback()
+            # Continue anyway - don't fail the response
         
-        response = ChatResponse(response=ai_response, ai_name=ai_name)
-        logger.info(f"Returning response for user: {user_id}")
+        response = ChatResponse(
+            response=ai_response, 
+            ai_name=ai_name,
+            message_id=user_message_id if 'user_message_id' in locals() else None
+        )
+        logger.info(f"✅ Response sent to user: {user_id}")
         
         return response
         

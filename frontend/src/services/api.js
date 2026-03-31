@@ -38,9 +38,9 @@ api.interceptors.response.use(
 
 export const chatAPI = {
   // Send a message and get AI response
-  sendMessage: async (userId, message, personality = null) => {
+  sendMessage: async (userId, message, personality = null, messageId = null) => {
     try {
-      console.log('💬 Sending message from user:', userId)
+      console.log('💬 Sending message from user:', userId, messageId ? `(editing message ${messageId})` : '')
       
       const response = await api.post('/chat', {
         user_id: userId,
@@ -50,6 +50,7 @@ export const chatAPI = {
           energy: 'Chill',
           response_style: 'Medium',
         },
+        message_id: messageId,  // For editing/regenerating
       })
       
       if (!response.data?.response) {

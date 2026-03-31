@@ -20,9 +20,11 @@ class ChatRequest(BaseModel):
     user_id: Union[int, str]  # Accept both int and str
     message: str
     personality: Optional[PersonalityConfig] = None
+    message_id: Optional[int] = None  # For editing messages - if provided, updates existing message
 
 
 class ChatResponse(BaseModel):
     """Response body for chat endpoint"""
     response: str
     ai_name: str = "Luna"
+    message_id: Optional[int] = None  # ID of the user message (for regeneration/editing)

@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react'
 import ChatMessage from './ChatMessage'
 import { motion, AnimatePresence } from 'framer-motion'
 
-const MessageList = ({ messages, aiName, isLoading, error }) => {
+const MessageList = ({ messages, aiName, isLoading, error, onEditMessage, onRegenerateMessage }) => {
   const endRef = useRef(null)
 
   useEffect(() => {
@@ -48,6 +48,9 @@ const MessageList = ({ messages, aiName, isLoading, error }) => {
                   isUser={msg.role === 'user'}
                   aiName={aiName}
                   timestamp={new Date()}
+                  messageId={idx}
+                  onEdit={onEditMessage}
+                  onRegenerate={onRegenerateMessage}
                 />
               </motion.div>
             ))}

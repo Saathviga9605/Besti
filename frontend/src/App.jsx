@@ -123,50 +123,178 @@ function App() {
   }
 
   // Handle sending a message
-  const handleSendMessage = async (message) => {
-    if (!message.trim() || !userId) return
+  const handleSendMessage = async (message, messageId = null) => {
+    if (!message.trim()) {
+      console.log('❌ Cannot send message: empty text')
+      setError('Message cannot be empty')
+      return
+    }
 
+    if (!userId) {
+      console.log('❌ Cannot send message: no userId')
+      setError('User ID missing - please log in again')
+      return
+    }
+
+    console.log('📤 handleSendMessage called:', { message: message.substring(0, 30), messageId, userId, currentChatId: activeConversationId })
+    
     setError(null)
     pulseGlow()
 
-    const newMessages = [...currentMessages, { role: 'user', content: message }]
-    setCurrentMessages(newMessages)
-    setTyping(true)
+    // Save the original state in case we need to roll back
+    const originalMessages = currentMessages
+    const originalConversations = conversations
+    const originalActiveChat = activeConversationId
 
     try {
-      const response = await chatAPI.sendMessage(userId, message, preferences.personality)
-
-      if (!response.response) {
-        throw new Error('Empty response from AI')
+      // Create or use existing chat
+      let chatId = activeConversationId
+      let newConversations = conversations
+      
+      if (!chatId) {
+        console.log('📌 No active chat, creating new...')
+        chatId = `chat_${Date.now()}`
+        const newChat = {
+          id: chatId,
+          name: `${new Date().toLocaleDateString()}`,
+          preview: 'Sending message...',
+          messages: [],
+        }
+        newConversations = [newChat, ...conversations]
+        setConversations(newConversations)
+        setActiveConversation(chatId)
+        console.log('✅ New chat created:', chatId)
       }
 
+      // Add user message to local state immediately (visual feedback)
+      const newMessages = messageId !== null 
+        ? currentMessages 
+        : [...currentMessages, { role: 'user', content: message }]
+      setCurrentMessages(newMessages)
+      setTyping(true)
+
+      console.log('🚀 Calling API with userId:', userId)
+      const response = await chatAPI.sendMessage(userId, message, preferences.personality, messageId)
+
+      if (!response || !response.response) {
+        throw new Error('Invalid response from server - empty or malformed')
+      }
+
+      console.log('✅ Got AI response:', response.response.substring(0, 50) + '...')
+
+      // Besti 2.0: Extract emotion data
+      if (response.emotion) {
+        setCurrentEmotion(response.emotion)
+        setEmotionIntensity(response.emotion_intensity || 0.5)
+        console.log('😊 Emotion detected:', response.emotion, response.emotion_intensity)
+      }
+
+      // Build messages with AI response
       const messagesWithResponse = [
         ...newMessages,
         { role: 'assistant', content: response.response },
       ]
+      
+      console.log('📝 Updated messages, count:', messagesWithResponse.length)
       setCurrentMessages(messagesWithResponse)
 
-      if (currentChat) {
-        const updatedChat = {
-          ...currentChat,
-          preview: response.response.substring(0, 50) + '...',
-          messages: messagesWithResponse,
-        }
-
-        // Update Zustand store
-        const savedConv = conversations.map((c) =>
-          c.id === currentChat.id ? updatedChat : c
-        )
-        setConversations(savedConv)
+      // Update the conversation with new messages
+      const updatedChat = {
+        id: chatId,
+        name: `${new Date().toLocaleDateString()}`,
+        preview: response.response.substring(0, 50) + '...',
+        messages: messagesWithResponse,
       }
+
+      // Update conversations list
+      const existingIndex = newConversations.findIndex(c => c.id === chatId)
+      let updatedConversations
+      
+      if (existingIndex >= 0) {
+        // Update existing conversation
+        updatedConversations = [...newConversations]
+        updatedConversations[existingIndex] = updatedChat
+        console.log('🔄 Updated existing conversation at index:', existingIndex)
+      } else {
+        // Add new conversation
+        updatedConversations = [updatedChat, ...newConversations]
+        console.log('➕ Added new conversation')
+      }
+
+      setConversations(updatedConversations)
+      setActiveConversation(chatId)
+      
+      console.log('✅ All state updated successfully!')
+      console.log('   - activeConversationId:', chatId)
+      console.log('   - conversations count:', updatedConversations.length)
+      console.log('   - messages count:', messagesWithResponse.length)
+      
     } catch (error) {
-      console.error('Error sending message:', error)
-      const errorMessage = error.message || 'Failed to get response from AI'
+      console.error('❌ Error in handleSendMessage:', error)
+      const errorMessage = error.message || 'Failed to send message'
+      console.error('   Error details:', errorMessage)
+      
       setError(errorMessage)
-      setCurrentMessages(newMessages.slice(0, -1))
-    } finally {
       setTyping(false)
+      
+      // Only roll back if it was a new message
+      if (messageId === null && originalMessages.length < currentMessages.length) {
+        console.log('⏮️ Rolling back message - removing the unsent message')
+        setCurrentMessages(originalMessages)
+      }
+      
+      return // Don't continue to finally block below
     }
+    
+    setTyping(false)
+  }
+
+  // Handle editing a message
+  const handleEditMessage = async (messageId, editedContent) => {
+    console.log(`✏️ Editing message ${messageId}: "${editedContent}"`)
+    
+    // Update the message in currentMessages
+    const updatedMessages = [...currentMessages]
+    updatedMessages[messageId] = {
+      ...updatedMessages[messageId],
+      content: editedContent
+    }
+    
+    // If this is a user message with an AI response following it, regenerate the response
+    if (messageId % 2 === 0 && messageId + 1 < updatedMessages.length) {
+      // This is a user message with an AI response following it
+      // Delete the AI response and regenerate
+      const messagesBeforeResponse = updatedMessages.slice(0, messageId + 1)
+      setCurrentMessages(messagesBeforeResponse)
+      
+      // Send the edited message with its ID to backend
+      await handleSendMessage(editedContent, messageId)
+    }
+  }
+
+  // Handle regenerating an AI response
+  const handleRegenerateMessage = async (messageId) => {
+    console.log(`🔄 Regenerating response for message ${messageId}`)
+    
+    // Find the user message before this AI response (previous message)
+    const userMessageId = messageId - 1
+    if (userMessageId < 0 || userMessageId >= currentMessages.length) {
+      setError('Could not find the message to regenerate')
+      return
+    }
+    
+    const userMessage = currentMessages[userMessageId]
+    if (userMessage.role !== 'user') {
+      setError('Invalid message structure')
+      return
+    }
+    
+    // Remove the AI response 
+    const messagesBeforeResponse = currentMessages.slice(0, messageId)
+    setCurrentMessages(messagesBeforeResponse)
+    
+    // Send the user message again with its ID (without incrementing, just replacing the response)
+    await handleSendMessage(userMessage.content, userMessageId)
   }
 
   // Handle new chat
@@ -324,6 +452,8 @@ function App() {
               aiName={preferences.ai_name}
               isLoading={isTyping}
               error={error}
+              onEditMessage={handleEditMessage}
+              onRegenerateMessage={handleRegenerateMessage}
             />
 
             {/* Input Footer */}
