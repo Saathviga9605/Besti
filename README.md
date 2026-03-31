@@ -1,263 +1,229 @@
 # Besti - AI Best Friend Chat Application
 
-A full-stack web application featuring an emotionally engaging AI companion with personality customization.
+Besti is a full-stack chat app for emotionally intelligent conversations with an AI companion.
 
-## 🚀 Features
+## What Is New
 
-- **Personalized AI Companion**: Chat with Luna (or customize the name)
-- **Personality Customization**: Adjust tone, energy, and response style
-- **Beautiful Modern UI**: Glassmorphism design with smooth animations
-- **Real-time Chat**: Instant responses with typing indicators
-- **Chat History**: Persistent conversation history
-- **Local Storage**: Preserves user data locally
-- **Responsive Design**: Works seamlessly on desktop and mobile
+Recent features now included in the app:
 
-## 📋 Prerequisites
+- Authentication with signup/login and JWT sessions
+- Pinned messages with pin/unpin toggle
+- Memory View page: "Things I Remember About You"
+- Emotional check-ins triggered by message cadence and time gap
+- Chat export with format picker (TXT and JSON)
+- Avatar generation and personality customization
 
-- Python 3.8+ (for backend)
-- Node.js 16+ (for frontend)
+## Core Features
+
+- Personalized AI companion with configurable tone, energy, and style
+- Multi-conversation chat layout with persistent history
+- Pinned section in sidebar for important moments
+- Memory categories visible to users:
+  - Likes
+  - Important moments
+  - Emotional states
+- Export active conversation from sidebar
+- Responsive UI for desktop and mobile
+
+## Tech Stack
+
+- Backend: FastAPI, SQLAlchemy, SQLite
+- Frontend: React, Vite, Zustand, Framer Motion
+- AI: OpenAI via backend service
+
+## Prerequisites
+
+- Python 3.8+
+- Node.js 16+
 - OpenAI API key
-- git (optional)
 
-## 🔧 Setup & Installation
+## Setup
 
-### 1. Backend Setup (FastAPI)
+### Backend
 
-Navigate to the backend directory:
 ```bash
 cd backend
-```
-
-Create a virtual environment:
-```bash
 python -m venv venv
 ```
 
-Activate the virtual environment:
-- **Windows**:
-  ```bash
-  venv\Scripts\activate
-  ```
-- **macOS/Linux**:
-  ```bash
-  source venv/bin/activate
-  ```
+Activate virtual environment:
+
+- Windows:
+
+```bash
+venv\Scripts\activate
+```
+
+- macOS/Linux:
+
+```bash
+source venv/bin/activate
+```
 
 Install dependencies:
+
 ```bash
 pip install -r requirements.txt
 ```
 
-Create a `.env` file by copying `.env.example`:
+Create `.env` from example and set key:
+
 ```bash
 copy .env.example .env
 # or
 cp .env.example .env
 ```
 
-Edit `.env` and add your OpenAI API key:
-```
+`.env` example:
+
+```env
 OPENAI_API_KEY=your_api_key_here
 PORT=8000
 ```
 
-Start the backend server:
+Start backend:
+
 ```bash
 python main.py
 ```
 
-The backend will be available at `http://localhost:8000`
+Backend runs on `http://localhost:8000`.
 
-### 2. Frontend Setup (React)
+### Frontend
 
-In a new terminal, navigate to the frontend directory:
 ```bash
 cd frontend
-```
-
-Install dependencies:
-```bash
 npm install
 ```
 
-Create a `.env.local` file (optional, defaults work):
+Optional env file:
+
 ```bash
 VITE_API_URL=http://localhost:8000
 ```
 
-Start the development server:
+Start frontend:
+
 ```bash
 npm run dev
 ```
 
-The frontend will be available at `http://localhost:3000`
+Frontend runs on `http://localhost:3000`.
 
-## 🎮 Using the Application
+## Using Besti
 
-1. **Open the App**: Visit `http://localhost:3000` in your browser
-2. **Send Your First Message**: Type in the chat input and press Enter or click Send
-3. **Customize Your AI**: Click the ⚙️ Settings button to:
-   - Change the AI's name
-   - Choose personality tone (Caring, Funny, Sarcastic, Protective, Romantic)
-   - Select energy level (Chill, Chaotic, Deep)
-   - Pick response style (Short, Medium, Long, Emoji-heavy)
-4. **Start New Chats**: Use the "+ New Chat" button to create multiple conversations
-5. **Chat History**: Your conversations are saved and persist across sessions
+1. Sign up or log in.
+2. Start a chat from the sidebar.
+3. Send messages and receive AI responses.
+4. Pin meaningful messages using the pin icon on message hover.
+5. Open Memory View from sidebar to see remembered items.
+6. Export current chat as TXT or JSON via format picker.
 
-## 📁 Project Structure
+## Emotional Check-In System
 
-```
-Besti/
+Besti can proactively ask check-in prompts such as:
+
+- "How are you feeling today?"
+- "Want to talk about anything?"
+
+Trigger logic:
+
+- Message count threshold
+- Time gap since last check-in
+- User personality check-in frequency setting (hours)
+
+## API Endpoints
+
+### Auth
+
+- `POST /auth/signup`
+- `POST /auth/login`
+- `POST /auth/logout`
+- `GET /auth/me`
+
+### Chat and Preferences
+
+- `POST /chat`
+- `GET /history/{user_id}`
+- `POST /clear/{user_id}`
+- `POST /preferences`
+- `GET /preferences/{user_id}`
+
+### Avatar
+
+- `POST /avatar/generate`
+- `GET /avatar/{user_id}`
+
+### Pinned Messages
+
+- `POST /pin-message` (auth required)
+- `DELETE /pin-message/{message_id}` (auth required)
+- `GET /pinned-messages` (auth required)
+
+### Memory
+
+- `GET /memories` (auth required)
+
+## Export Format
+
+### TXT
+
+Includes:
+
+- Conversation metadata
+- Chronological messages
+- Per-message timestamp and role
+
+### JSON
+
+Includes:
+
+- Conversation object (`id`, `name`, `exported_at`, `message_count`)
+- Structured message array with role/content/timestamp
+
+## Project Structure
+
+```text
+BESTI/
 ├── backend/
-│   ├── main.py              # FastAPI app entry point
-│   ├── models.py            # Pydantic models
-│   ├── services.py          # LLM service & OpenAI integration
-│   ├── requirements.txt      # Python dependencies
-│   ├── .env.example          # Environment template
-│   └── venv/               # Virtual environment (created locally)
-│
-└── frontend/
-    ├── src/
-    │   ├── main.jsx          # React entry point
-    │   ├── App.jsx           # Main app component
-    │   ├── index.css         # Global styles
-    │   ├── components/       # React components
-    │   │   ├── ChatMessage.jsx
-    │   │   ├── MessageList.jsx
-    │   │   ├── ChatInput.jsx
-    │   │   ├── Sidebar.jsx
-    │   │   └── PersonalityModal.jsx
-    │   └── services/
-    │       └── api.js        # API service (axios)
-    ├── package.json          # npm dependencies
-    ├── vite.config.js        # Vite configuration
-    ├── tailwind.config.js    # Tailwind CSS config
-    ├── postcss.config.js     # PostCSS config
-    ├── .env.example          # Environment template
-    └── index.html            # HTML entry point
+│   ├── main.py
+│   ├── orm.py
+│   ├── models.py
+│   ├── services.py
+│   ├── auth.py
+│   ├── database.py
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   │   ├── App.jsx
+│   │   ├── services/api.js
+│   │   ├── components/
+│   │   └── pages/
+│   ├── package.json
+│   └── vite.config.js
+└── README.md
 ```
 
-## 🔌 API Endpoints
+## Troubleshooting
 
-### POST `/chat`
-Send a message and get AI response
+- Backend not reachable:
+  - Confirm backend is running on port 8000.
+  - Check `.env` and OpenAI API key.
+- Frontend API errors:
+  - Confirm `VITE_API_URL` points to backend.
+  - Verify both servers are running.
+- Pinning fails:
+  - Ensure you are logged in.
+  - Ensure the message exists in persisted chat history.
+- Memory View is empty:
+  - No memory rows are stored yet for this user.
 
-**Request:**
-```json
-{
-  "user_id": "string",
-  "message": "string",
-  "personality": {
-    "tone": "Caring",
-    "energy": "Chill",
-    "response_style": "Medium"
-  }
-}
-```
+## Security Notes
 
-**Response:**
-```json
-{
-  "response": "string",
-  "ai_name": "Luna"
-}
-```
+- Never commit real `.env` files.
+- Restrict CORS origins in production.
+- Add rate limits and stronger production auth controls.
 
-### GET `/history/{user_id}`
-Get chat history for a user
+## License
 
-### POST `/clear/{user_id}`
-Clear chat history for a user
-
-### POST `/preferences`
-Save user preferences (AI name and personality)
-
-### GET `/preferences/{user_id}`
-Get user preferences
-
-## 🎨 Customization
-
-### Change AI Appearance
-Edit the avatar gradient colors in `src/components/ChatMessage.jsx` and `src/components/MessageList.jsx`
-
-### Modify System Prompt
-Edit the `build_system_prompt()` method in `backend/services.py` to customize AI behavior
-
-### Update Color Scheme
-Edit `frontend/tailwind.config.js` to change the primary colors
-
-### Adjust UI Layout
-Components are located in `frontend/src/components/` - modify as needed
-
-## 🐛 Troubleshooting
-
-### Backend not connecting
-- Ensure backend is running: `python main.py` in the backend directory
-- Check that port 8000 is not in use
-- Verify OpenAI API key is valid
-
-### API requests failing
-- Check browser console (F12) for CORS errors
-- Ensure both frontend and backend are running
-- Verify API URL in frontend `.env.local`
-
-### Styling issues
-- Clear browser cache (Ctrl+Shift+Delete)
-- Run `npm run build` to rebuild frontend
-- Ensure Tailwind CSS is properly configured
-
-### Chat history not saving
-- Check browser's localStorage is enabled
-- Clear old data: open DevTools → Application → Local Storage → Clear
-
-## 📦 Building for Production
-
-### Backend
-```bash
-cd backend
-# Install gunicorn for production
-pip install gunicorn
-# Run with gunicorn
-gunicorn main:app --workers 4 --bind 0.0.0.0:8000
-```
-
-### Frontend
-```bash
-cd frontend
-npm run build
-# Built files are in 'dist' directory
-# Serve with any static file server
-```
-
-## 🔐 Security Notes
-
-- **Never commit `.env` files** - Always add to `.gitignore`
-- **Validate OpenAI API usage** to avoid unexpected charges
-- **Set CORS properly** in production (don't use '*')
-- **Implement rate limiting** for production
-
-## 📝 License
-
-This project is created as an MVP demonstration.
-
-## 💡 Future Enhancements
-
-- Database integration (PostgreSQL/MongoDB) for persistent storage
-- User authentication and accounts
-- Multiple AI personalities to choose from
-- Voice messaging and TTS
-- Export conversations
-- Dark/light theme toggle
-- Real-time multiplayer chat
-- Image sharing in chat
-- Advanced memory system with semantic search
-
-## 🤝 Support
-
-For issues or questions, check the setup steps above or verify that:
-1. Python and Node.js are properly installed
-2. OpenAI API key is valid
-3. Environment variables are set correctly
-4. Both frontend and backend processes are running
-
-Enjoy chatting with Besti! 🌟
+Project is provided as an MVP demonstration.
