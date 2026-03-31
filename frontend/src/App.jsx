@@ -177,9 +177,10 @@ function App() {
       }
 
       // Add user message to local state immediately (visual feedback)
+      // Don't add ID yet - will be added when response comes back
       const newMessages = messageId !== null 
         ? currentMessages 
-        : [...currentMessages, { role: 'user', content: message }]
+        : [...currentMessages, { role: 'user', content: message, id: null }]
       setCurrentMessages(newMessages)
       setTyping(true)
 
@@ -205,22 +206,30 @@ function App() {
       }
 
       // Build messages with AI response (include typing_delay for animation and IDs for pinning)
+      if (!response.message_id || !response.response_message_id) {
+        console.warn('⚠️ WARNING: Backend did not return message IDs!', { 
+          message_id: response.message_id, 
+          response_message_id: response.response_message_id,
+          apiResponse: response 
+        })
+      }
+      
       const messagesWithResponse = [
         ...newMessages.slice(0, -1), // Previous messages
         { 
           role: 'user', 
           content: message,
-          id: response.message_id  // Store the user message ID
+          id: response.message_id  // Store the user message ID from backend
         },
         { 
           role: 'assistant', 
           content: response.response,
-          id: response.response_message_id,  // Store the assistant message ID
+          id: response.response_message_id,  // Store the assistant message ID from backend
           typing_delay: response.typing_delay || 0
         },
       ]
       
-      console.log('📝 Updated messages, count:', messagesWithResponse.length)
+      console.log('📝 Updated messages with IDs:', messagesWithResponse.map(m => ({ role: m.role, has_id: !!m.id, id: m.id })))
       setCurrentMessages(messagesWithResponse)
 
       // Update the conversation with new messages
@@ -328,9 +337,19 @@ function App() {
     
     try {
       const message = currentMessages[messageIdx]
-      if (!message || !message.id) {
-        console.warn('⚠️ Message does not have a database ID:', message)
-        setError('Cannot pin this message - missing message ID')
+      if (!message) {
+        console.warn('⚠️ Message not found at index:', messageIdx)
+        setError('Cannot pin this message - message not found')
+        return
+      }
+      
+      if (!message.id) {
+        console.error('❌ Message ID missing:', { 
+          messageIdx, 
+          message: message,
+          allMessages: currentMessages.map((m, i) => ({index: i, role: m.role, id: m.id}))
+        })
+        setError('⚠️ Cannot pin this message - missing database ID. Try sending a new message and pinning that instead.')
         return
       }
       

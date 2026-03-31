@@ -325,6 +325,10 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
         )
         logger.info(f"✅ LLM response generated (length: {len(ai_response)})")
         
+        # Initialize message IDs (will be populated if DB save succeeds)
+        user_message_id = None
+        ai_message_id = None
+        
         # Save user message to database
         try:
             user_chat_msg = ChatHistory(
@@ -352,7 +356,7 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
         except Exception as e:
             logger.error(f"⚠️ Error saving chat history: {e}")
             db.rollback()
-            # Continue anyway - don't fail the response
+            logger.warning(f"⚠️ Messages not saved to database - pinning may not work for this message")
         
         # Calculate typing delay based on response length
         # Simulate realistic typing speed: ~100ms per word + 500ms base
@@ -363,8 +367,8 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
         response = ChatResponse(
             response=ai_response, 
             ai_name=ai_name,
-            message_id=user_message_id if 'user_message_id' in locals() else None,
-            response_message_id=ai_message_id if 'ai_message_id' in locals() else None,
+            message_id=user_message_id,  # Will be None if DB save failed
+            response_message_id=ai_message_id,  # Will be None if DB save failed
             typing_delay=typing_delay
         )
         logger.info(f"✅ Response sent to user: {user_id}")
