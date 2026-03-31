@@ -1,12 +1,50 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
-const ChatMessage = ({ message, isUser, aiName, timestamp, messageId, onEdit, onRegenerate }) => {
+const ChatMessage = ({ message, isUser, aiName, timestamp, messageId, onEdit, onRegenerate, typing_delay = 0 }) => {
   const [reactions, setReactions] = useState({})
   const [showReactions, setShowReactions] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [editText, setEditText] = useState(message)
   const [showActions, setShowActions] = useState(false)
+  const [displayedText, setDisplayedText] = useState(isUser ? message : '')
+  const [isTyping, setIsTyping] = useState(!isUser && typing_delay > 0)
+  const [wordIndex, setWordIndex] = useState(0)
+
+  // Handle typing animation for AI messages
+  useEffect(() => {
+    if (isUser || typing_delay <= 0) {
+      // User messages display instantly
+      setDisplayedText(message)
+      setIsTyping(false)
+      return
+    }
+
+    // AI message typing animation
+    const words = message.split(' ')
+    const totalWords = words.length
+    const delayPerWord = typing_delay / Math.max(totalWords, 1)
+
+    let currentIndex = 0
+    let currentDisplayText = ''
+
+    const typeNextWord = () => {
+      if (currentIndex < totalWords) {
+        currentDisplayText += (currentIndex > 0 ? ' ' : '') + words[currentIndex]
+        setDisplayedText(currentDisplayText)
+        currentIndex++
+        setTimeout(typeNextWord, Math.max(delayPerWord, 50)) // Min 50ms per word
+      } else {
+        setIsTyping(false)
+      }
+    }
+
+    // Start typing after brief initial delay
+    const initialDelay = Math.min(300, delayPerWord * 0.2)
+    const timeoutId = setTimeout(typeNextWord, initialDelay)
+
+    return () => clearTimeout(timeoutId)
+  }, [message, isUser, typing_delay])
 
   const reactionEmojis = ['❤️', '😂', '😢', '🔥', '👀']
 
@@ -101,11 +139,22 @@ const ChatMessage = ({ message, isUser, aiName, timestamp, messageId, onEdit, on
             whileHover={!isUser ? { scale: 1.02 } : {}}
             className={`${isUser ? 'bubble-user' : 'bubble-ai'} relative group`}
           >
-            {message}
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                {displayedText}
+                {isTyping && !isUser && (
+                  <motion.span
+                    animate={{ opacity: [1, 0.5, 1] }}
+                    transition={{ duration: 0.8, repeat: Infinity }}
+                    className="inline-block w-2 h-5 ml-1 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full align-text-bottom"
+                  />
+                )}
+              </div>
+            </div>
 
             {/* Hover Actions */}
             <AnimatePresence>
-              {showActions && (
+              {showActions && !isTyping && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}

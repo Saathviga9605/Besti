@@ -332,10 +332,17 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
             db.rollback()
             # Continue anyway - don't fail the response
         
+        # Calculate typing delay based on response length
+        # Simulate realistic typing speed: ~100ms per word + 500ms base
+        word_count = len(ai_response.split())
+        typing_delay = min(word_count * 100 + 500, 15000)  # Max 15 seconds
+        logger.info(f"⏱️ Typing delay calculated: {typing_delay}ms for {word_count} words")
+        
         response = ChatResponse(
             response=ai_response, 
             ai_name=ai_name,
-            message_id=user_message_id if 'user_message_id' in locals() else None
+            message_id=user_message_id if 'user_message_id' in locals() else None,
+            typing_delay=typing_delay
         )
         logger.info(f"✅ Response sent to user: {user_id}")
         

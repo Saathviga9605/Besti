@@ -51,6 +51,7 @@ const MessageList = ({ messages, aiName, isLoading, error, onEditMessage, onRege
                   messageId={idx}
                   onEdit={onEditMessage}
                   onRegenerate={onRegenerateMessage}
+                  typing_delay={msg.typing_delay || 0}
                 />
               </motion.div>
             ))}

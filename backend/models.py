@@ -28,3 +28,4 @@ class ChatResponse(BaseModel):
     response: str
     ai_name: str = "Luna"
     message_id: Optional[int] = None  # ID of the user message (for regeneration/editing)
+    typing_delay: Optional[int] = None  # Delay in milliseconds for typing animation

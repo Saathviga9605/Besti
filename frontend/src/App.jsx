@@ -182,6 +182,11 @@ function App() {
 
       console.log('✅ Got AI response:', response.response.substring(0, 50) + '...')
 
+      // Log typing delay for debugging
+      if (response.typing_delay) {
+        console.log(`⏱️ Typing delay from API: ${response.typing_delay}ms`)
+      }
+
       // Besti 2.0: Extract emotion data
       if (response.emotion) {
         setCurrentEmotion(response.emotion)
@@ -189,10 +194,14 @@ function App() {
         console.log('😊 Emotion detected:', response.emotion, response.emotion_intensity)
       }
 
-      // Build messages with AI response
+      // Build messages with AI response (include typing_delay for animation)
       const messagesWithResponse = [
         ...newMessages,
-        { role: 'assistant', content: response.response },
+        { 
+          role: 'assistant', 
+          content: response.response,
+          typing_delay: response.typing_delay || 0
+        },
       ]
       
       console.log('📝 Updated messages, count:', messagesWithResponse.length)
