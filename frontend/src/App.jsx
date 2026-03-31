@@ -58,6 +58,95 @@ function App() {
   const [showAvatarPicker, setShowAvatarPicker] = useState(false)
   const [pinnedMessageIds, setPinnedMessageIds] = useState([])
 
+  const downloadFile = (content, filename, mimeType) => {
+    const blob = new Blob([content], { type: mimeType })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
+  const formatTimestamp = (value) => {
+    if (!value) return new Date().toISOString()
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return new Date().toISOString()
+    return date.toISOString()
+  }
+
+  const handleExportChat = (formatChoice) => {
+    if (!currentChat || !currentMessages.length) {
+      setError('No messages to export yet')
+      return
+    }
+
+    if (!formatChoice) {
+      setError('Choose an export format')
+      return
+    }
+
+    const normalizedFormat = formatChoice.trim().toLowerCase()
+    if (normalizedFormat !== 'txt' && normalizedFormat !== 'json') {
+      setError('Invalid export format. Use txt or json.')
+      return
+    }
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const safeChatName = (currentChat.name || 'conversation').replace(/[^a-zA-Z0-9_-]/g, '_')
+    const baseFilename = `besti_${safeChatName}_${timestamp}`
+
+    const exportMessages = currentMessages.map((msg, index) => ({
+      index,
+      role: msg.role || 'assistant',
+      content: msg.content || '',
+      timestamp: formatTimestamp(msg.created_at || msg.timestamp),
+    }))
+
+    if (normalizedFormat === 'json') {
+      const payload = {
+        conversation: {
+          id: currentChat.id,
+          name: currentChat.name,
+          exported_at: new Date().toISOString(),
+          message_count: exportMessages.length,
+        },
+        messages: exportMessages,
+      }
+
+      downloadFile(
+        JSON.stringify(payload, null, 2),
+        `${baseFilename}.json`,
+        'application/json;charset=utf-8'
+      )
+      return
+    }
+
+    const txtLines = [
+      `Besti Chat Export`,
+      `Conversation: ${currentChat.name || 'Untitled'}`,
+      `Conversation ID: ${currentChat.id}`,
+      `Exported At: ${new Date().toISOString()}`,
+      `Total Messages: ${exportMessages.length}`,
+      '',
+      '---',
+      '',
+      ...exportMessages.flatMap((msg) => ([
+        `[${msg.timestamp}] ${msg.role.toUpperCase()}`,
+        msg.content,
+        '',
+      ])),
+    ]
+
+    downloadFile(
+      txtLines.join('\n'),
+      `${baseFilename}.txt`,
+      'text/plain;charset=utf-8'
+    )
+  }
+
   // Check authentication on mount
   useEffect(() => {
     const checkAuth = async () => {
@@ -177,9 +266,10 @@ function App() {
       }
 
       // Add user message to local state immediately (visual feedback)
+      const userMessageTimestamp = new Date().toISOString()
       const newMessages = messageId !== null 
         ? currentMessages 
-        : [...currentMessages, { role: 'user', content: message }]
+        : [...currentMessages, { role: 'user', content: message, created_at: userMessageTimestamp }]
       setCurrentMessages(newMessages)
       setTyping(true)
 
@@ -210,7 +300,8 @@ function App() {
         { 
           role: 'assistant', 
           content: response.response,
-          typing_delay: response.typing_delay || 0
+          typing_delay: response.typing_delay || 0,
+          created_at: new Date().toISOString(),
         },
       ]
       
@@ -472,6 +563,7 @@ function App() {
         conversations={conversations}
         activeConversationId={activeConversationId}
         onNewChat={handleNewChat}
+        onExportChat={handleExportChat}
         onSelectChat={handleSelectChat}
         onOpenSettings={() => setSettingsOpen(true)}
         username={username}

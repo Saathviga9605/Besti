@@ -1,10 +1,11 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import useStore from '../store/useStore'
 
-const Sidebar = ({ conversations, activeConversationId, onNewChat, onSelectChat, onOpenSettings, username, onLogout, pinnedMessages = [], onSelectPinnedMessage }) => {
+const Sidebar = ({ conversations, activeConversationId, onNewChat, onExportChat, onSelectChat, onOpenSettings, username, onLogout, pinnedMessages = [], onSelectPinnedMessage }) => {
   const { sidebarExpanded, toggleSidebar } = useStore()
   const streak = localStorage.getItem('besti_streak') || '0'
+  const [showExportPicker, setShowExportPicker] = useState(false)
 
   return (
     <motion.div
@@ -40,6 +41,53 @@ const Sidebar = ({ conversations, activeConversationId, onNewChat, onSelectChat,
       >
         + New Conversation
       </motion.button>
+
+      <div className="mx-4 mb-4">
+        <motion.button
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          onClick={() => setShowExportPicker((prev) => !prev)}
+          className="new-chat-btn w-full"
+          type="button"
+        >
+          Export Chat
+        </motion.button>
+
+        <AnimatePresence>
+          {showExportPicker && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              className="mt-2 p-2 rounded-lg bg-white/5 border border-white/10"
+            >
+              <p className="text-xs text-text-ghost mb-2 px-1">Choose format</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    onExportChat('txt')
+                    setShowExportPicker(false)
+                  }}
+                  className="flex-1 px-3 py-2 text-xs rounded-md bg-white/8 hover:bg-white/12 text-white transition"
+                  type="button"
+                >
+                  TXT
+                </button>
+                <button
+                  onClick={() => {
+                    onExportChat('json')
+                    setShowExportPicker(false)
+                  }}
+                  className="flex-1 px-3 py-2 text-xs rounded-md bg-white/8 hover:bg-white/12 text-white transition"
+                  type="button"
+                >
+                  JSON
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       {/* Chat History */}
       <div className="chat-list flex-1 overflow-y-auto">

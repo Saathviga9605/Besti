@@ -4,12 +4,14 @@ from dotenv import load_dotenv
 import os
 import logging
 import secrets
+import random
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 from pydantic import BaseModel
 from models import ChatRequest, ChatResponse, Message, PersonalityConfig
 from services import llm_service
 from database import init_db, get_db, SessionLocal
-from orm import User, Avatar, ChatHistory, PinnedMessage
+from orm import User, Avatar, ChatHistory, PinnedMessage, Personality
 from auth import hash_password, verify_password, create_access_token, verify_token
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -254,6 +256,71 @@ async def get_me(current_user: User = Depends(get_current_user)):
 chat_histories: Dict[str, List[Message]] = {}
 user_preferences: Dict[str, Dict] = {}  # Store AI name and personality preferences
 
+# Emotional check-in prompts and smart trigger settings
+CHECKIN_PROMPTS = [
+    "How are you feeling today?",
+    "Want to talk about anything?",
+]
+CHECKIN_MESSAGE_COUNT_THRESHOLD = 4
+
+
+def _normalize_to_utc(dt: Optional[datetime]) -> Optional[datetime]:
+    """Normalize DB timestamps for safe UTC comparisons."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _is_checkin_message(content: str) -> bool:
+    """Detect whether an assistant message is one of our check-in prompts."""
+    normalized = content.lower().strip()
+    return any(prompt.lower() in normalized for prompt in CHECKIN_PROMPTS)
+
+
+def _should_insert_checkin(user_id: int, db: Session, checkin_hours: int) -> bool:
+    """Trigger check-in based on user message count or elapsed time since last check-in."""
+    messages = db.query(ChatHistory)\
+        .filter(ChatHistory.user_id == user_id)\
+        .order_by(ChatHistory.created_at.asc())\
+        .all()
+
+    user_messages_since_last_checkin = 0
+    last_checkin_at: Optional[datetime] = None
+
+    for msg in messages:
+        if msg.role == "assistant" and _is_checkin_message(msg.message):
+            user_messages_since_last_checkin = 0
+            last_checkin_at = msg.created_at
+            continue
+
+        if msg.role == "user":
+            user_messages_since_last_checkin += 1
+
+    # Include the current inbound user message (not yet persisted at this stage).
+    user_messages_since_last_checkin += 1
+    count_trigger = user_messages_since_last_checkin >= CHECKIN_MESSAGE_COUNT_THRESHOLD
+
+    time_trigger = False
+    if last_checkin_at is None:
+        # First meaningful interaction: allow a gentle check-in after enough messages.
+        time_trigger = False
+    else:
+        now_utc = datetime.now(timezone.utc)
+        checkin_utc = _normalize_to_utc(last_checkin_at)
+        elapsed_hours = (now_utc - checkin_utc).total_seconds() / 3600 if checkin_utc else 0
+        time_trigger = elapsed_hours >= checkin_hours
+
+    return count_trigger or time_trigger
+
+
+def _append_checkin_prompt(ai_response: str) -> str:
+    """Append a short emotional check-in to the assistant response."""
+    prompt = random.choice(CHECKIN_PROMPTS)
+    separator = "\n\n" if ai_response.strip() else ""
+    return f"{ai_response.strip()}{separator}{prompt}".strip()
+
 
 @app.get("/")
 async def root():
@@ -284,6 +351,12 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
             raise HTTPException(status_code=404, detail=f"User {user_id} not found")
         
         personality = request.personality or PersonalityConfig()
+
+        # Resolve check-in frequency from user profile; fallback to 3 hours.
+        db_personality = db.query(Personality).filter(Personality.user_id == user_id).first()
+        checkin_hours = 3
+        if db_personality and db_personality.checkin_frequency:
+            checkin_hours = max(1, min(24, int(db_personality.checkin_frequency)))
         
         logger.info(f"✅ User verified: {user.username}")
         
@@ -323,6 +396,12 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
             personality=personality,
             ai_name=ai_name
         )
+
+        # Smart emotional check-in trigger (message cadence + time gap)
+        if _should_insert_checkin(user_id=user_id, db=db, checkin_hours=checkin_hours):
+            ai_response = _append_checkin_prompt(ai_response)
+            logger.info(f"💙 Added emotional check-in prompt for user: {user_id}")
+
         logger.info(f"✅ LLM response generated (length: {len(ai_response)})")
         
         # Save user message to database
