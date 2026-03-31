@@ -2,7 +2,7 @@ import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import useStore from '../store/useStore'
 
-const Sidebar = ({ conversations, activeConversationId, onNewChat, onSelectChat, onOpenSettings, username, onLogout }) => {
+const Sidebar = ({ conversations, activeConversationId, onNewChat, onSelectChat, onOpenSettings, username, onLogout, pinnedMessages = [], onSelectPinnedMessage }) => {
   const { sidebarExpanded, toggleSidebar } = useStore()
   const streak = localStorage.getItem('besti_streak') || '0'
 
@@ -76,6 +76,45 @@ const Sidebar = ({ conversations, activeConversationId, onNewChat, onSelectChat,
           )}
         </AnimatePresence>
       </div>
+
+      {/* Pinned Messages Section */}
+      {pinnedMessages && pinnedMessages.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          className="mx-2 mb-4 border-t border-white/10 pt-3"
+        >
+          <div className="px-3 py-2">
+            <h3 className="text-xs font-semibold text-text-ghost uppercase tracking-wide mb-2 flex items-center gap-1">
+              <span>📌</span> Pinned ({pinnedMessages.length})
+            </h3>
+            <div className="space-y-1">
+              <AnimatePresence mode="popLayout">
+                {pinnedMessages.map((msg, idx) => (
+                  <motion.button
+                    key={msg.id}
+                    onClick={() => onSelectPinnedMessage && onSelectPinnedMessage(msg)}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -10 }}
+                    transition={{ delay: idx * 30 / 1000 }}
+                    className="w-full text-left p-2 rounded hover:bg-white/5 transition group"
+                    type="button"
+                    title={msg.message_content}
+                  >
+                    <p className="text-xs text-text-ghost group-hover:text-white truncate">
+                      {msg.message_content?.substring(0, 30)}...
+                    </p>
+                    <p className="text-xs text-text-ghost/50 mt-1">
+                      {msg.role === 'user' ? '👤' : '🤖'} {msg.role === 'user' ? 'You' : 'Besti'}
+                    </p>
+                  </motion.button>
+                ))}
+              </AnimatePresence>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* Streak Footer */}
       <motion.div className="sidebar-footer">

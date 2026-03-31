@@ -58,6 +58,18 @@ const useStore = create((set) => ({
       messages: { ...state.messages, [convId]: msgs },
     })),
 
+  /* ===== PINNED MESSAGES ===== */
+  pinnedMessages: [],
+  setPinnedMessages: (messages) => set({ pinnedMessages: messages }),
+  addPinnedMessage: (message) =>
+    set((state) => ({
+      pinnedMessages: [message, ...state.pinnedMessages],
+    })),
+  removePinnedMessage: (messageId) =>
+    set((state) => ({
+      pinnedMessages: state.pinnedMessages.filter((m) => m.id !== messageId),
+    })),
+
   /* ===== AI STATE ===== */
   isTyping: false,
   setTyping: (v) => set({ isTyping: v }),

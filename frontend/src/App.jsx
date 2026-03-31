@@ -35,6 +35,10 @@ function App() {
     personality,
     settingsOpen,
     setSettingsOpen,
+    pinnedMessages,
+    setPinnedMessages,
+    addPinnedMessage,
+    removePinnedMessage,
   } = useStore()
 
   // Local state
@@ -52,6 +56,7 @@ function App() {
   })
   const [avatarUrl, setAvatarUrl] = useState(null)
   const [showAvatarPicker, setShowAvatarPicker] = useState(false)
+  const [pinnedMessageIds, setPinnedMessageIds] = useState([])
 
   // Check authentication on mount
   useEffect(() => {
@@ -89,6 +94,11 @@ function App() {
         // Load avatar
         const avatar = await chatAPI.getAvatar(userId)
         setAvatarUrl(avatar.avatar_url)
+
+        // Load pinned messages
+        const pinned = await chatAPI.getPinnedMessages(authToken)
+        setPinnedMessages(pinned)
+        console.log('📌 Loaded pinned messages:', pinned.length)
 
         const history = await chatAPI.getHistory(userId)
 
@@ -194,12 +204,18 @@ function App() {
         console.log('😊 Emotion detected:', response.emotion, response.emotion_intensity)
       }
 
-      // Build messages with AI response (include typing_delay for animation)
+      // Build messages with AI response (include typing_delay for animation and IDs for pinning)
       const messagesWithResponse = [
-        ...newMessages,
+        ...newMessages.slice(0, -1), // Previous messages
+        { 
+          role: 'user', 
+          content: message,
+          id: response.message_id  // Store the user message ID
+        },
         { 
           role: 'assistant', 
           content: response.response,
+          id: response.response_message_id,  // Store the assistant message ID
           typing_delay: response.typing_delay || 0
         },
       ]
@@ -304,6 +320,56 @@ function App() {
     
     // Send the user message again with its ID (without incrementing, just replacing the response)
     await handleSendMessage(userMessage.content, userMessageId)
+  }
+
+  // Handle pinning a message
+  const handlePinMessage = async (messageIdx) => {
+    console.log(`📌 Pin/Unpin message at index ${messageIdx}`)
+    
+    try {
+      const message = currentMessages[messageIdx]
+      if (!message || !message.id) {
+        console.warn('⚠️ Message does not have a database ID:', message)
+        setError('Cannot pin this message - missing message ID')
+        return
+      }
+      
+      const messageId = message.id
+      const isCurrentlyPinned = pinnedMessageIds.includes(messageId)
+      
+      if (isCurrentlyPinned) {
+        // Unpin logic
+        const pinnedMsg = pinnedMessages.find((pm) => pm.chat_history_id === messageId)
+        if (pinnedMsg) {
+          await chatAPI.unpinMessage(authToken, pinnedMsg.id)
+          removePinnedMessage(pinnedMsg.id)
+          setPinnedMessageIds(pinnedMessageIds.filter((id) => id !== messageId))
+          console.log('✅ Message unpinned')
+        }
+      } else {
+        // Pin logic
+        try {
+          const result = await chatAPI.pinMessage(authToken, messageId)
+          addPinnedMessage(result)
+          setPinnedMessageIds([...pinnedMessageIds, messageId])
+          console.log('✅ Message pinned:', result)
+        } catch (err) {
+          console.error('Error pinning message:', err)
+          setError('Failed to pin message: ' + err.message)
+        }
+      }
+    } catch (error) {
+      console.error('Error handling pin action:', error)
+      setError('Failed to pin/unpin message')
+    }
+  }
+
+  // Handle select pinned message
+  const handleSelectPinnedMessage = (pinnedMsg) => {
+    console.log('📌 Selecting pinned message:', pinnedMsg.id)
+    // Navigate to the conversation where this message exists
+    // For now, we'll just show a toast or notification
+    setError(`Viewing pinned message: ${pinnedMsg.message_content?.substring(0, 30)}...`)
   }
 
   // Handle new chat
@@ -411,6 +477,8 @@ function App() {
         onOpenSettings={() => setSettingsOpen(true)}
         username={username}
         onLogout={handleLogout}
+        pinnedMessages={pinnedMessages}
+        onSelectPinnedMessage={handleSelectPinnedMessage}
       />
 
       {/* Chat Shell - The Stage */}
@@ -463,6 +531,8 @@ function App() {
               error={error}
               onEditMessage={handleEditMessage}
               onRegenerateMessage={handleRegenerateMessage}
+              onPinMessage={handlePinMessage}
+              pinnedMessageIds={pinnedMessageIds}
             />
 
             {/* Input Footer */}

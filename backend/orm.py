@@ -24,6 +24,7 @@ class User(Base):
     personality = relationship("Personality", back_populates="user", uselist=False, cascade="all, delete-orphan")
     avatar = relationship("Avatar", back_populates="user", uselist=False, cascade="all, delete-orphan")
     streak = relationship("Streak", back_populates="user", uselist=False, cascade="all, delete-orphan")
+    pinned_messages = relationship("PinnedMessage", cascade="all, delete-orphan")
     
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email}, username={self.username})>"
@@ -141,3 +142,24 @@ class Streak(Base):
     
     # Relationship
     user = relationship("User", back_populates="streak")
+
+
+class PinnedMessage(Base):
+    """Pinned messages model - saves important moments from conversations"""
+    __tablename__ = "pinned_messages"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    chat_history_id = Column(Integer, ForeignKey("chat_histories.id", ondelete="CASCADE"), nullable=False, index=True)
+    
+    # Denormalize message content for easy access
+    message_content = Column(Text, nullable=False)
+    role = Column(String(20), nullable=False)  # "user" or "assistant"
+    conversation_id = Column(String(50), nullable=False, index=True)  # Link to conversation
+    
+    pinned_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    pinned_note = Column(Text, nullable=True)  # Optional note about why pinned
+    
+    # Relationships
+    user = relationship("User")
+    chat_history = relationship("ChatHistory")

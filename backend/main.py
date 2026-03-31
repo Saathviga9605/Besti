@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from models import ChatRequest, ChatResponse, Message, PersonalityConfig
 from services import llm_service
 from database import init_db, get_db, SessionLocal
-from orm import User, Avatar, ChatHistory
+from orm import User, Avatar, ChatHistory, PinnedMessage
 from auth import hash_password, verify_password, create_access_token, verify_token
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -74,6 +74,26 @@ class UserResponse(BaseModel):
     username: str
     created_at: str
     is_active: bool
+
+    class Config:
+        from_attributes = True
+
+
+class PinMessageRequest(BaseModel):
+    """Request to pin a message"""
+    chat_history_id: int
+    pinned_note: Optional[str] = None
+
+
+class PinnedMessageResponse(BaseModel):
+    """Response for a pinned message"""
+    id: int
+    chat_history_id: int
+    message_content: str
+    role: str
+    conversation_id: str
+    pinned_at: str
+    pinned_note: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -325,8 +345,10 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
                 message=ai_response
             )
             db.add(ai_chat_msg)
+            db.flush()  # Get the AI message ID
+            ai_message_id = ai_chat_msg.id
             db.commit()
-            logger.info(f"✅ Messages saved to database (user_msg_id: {user_message_id})")
+            logger.info(f"✅ Messages saved to database (user_msg_id: {user_message_id}, ai_msg_id: {ai_message_id})")
         except Exception as e:
             logger.error(f"⚠️ Error saving chat history: {e}")
             db.rollback()
@@ -342,6 +364,7 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
             response=ai_response, 
             ai_name=ai_name,
             message_id=user_message_id if 'user_message_id' in locals() else None,
+            response_message_id=ai_message_id if 'ai_message_id' in locals() else None,
             typing_delay=typing_delay
         )
         logger.info(f"✅ Response sent to user: {user_id}")
@@ -382,16 +405,31 @@ async def set_preferences(user_id: str, ai_name: str = "Luna", personality: Pers
 
 
 @app.get("/history/{user_id}")
-async def get_history(user_id: str):
-    """Get chat history for a user"""
+async def get_history(user_id: str, db: Session = Depends(get_db)):
+    """Get chat history for a user from database"""
     
     try:
-        logger.info(f"Getting history for user: {user_id}")
+        user_id_int = int(user_id) if isinstance(user_id, str) else user_id
+        logger.info(f"Getting history for user: {user_id_int}")
         
-        # Convert to string for dict key consistency
-        user_id_str = str(user_id)
-        history = chat_histories.get(user_id_str, [])
-        return {"user_id": user_id_str, "messages": [{"role": msg.role, "content": msg.content} for msg in history]}
+        # Fetch from database
+        history = db.query(ChatHistory)\
+            .filter(ChatHistory.user_id == user_id_int)\
+            .order_by(ChatHistory.created_at.asc())\
+            .all()
+        
+        # Return with message IDs for pinning
+        messages = [
+            {
+                "id": msg.id,
+                "role": msg.role,
+                "content": msg.message,
+                "conversation_id": msg.conversation_id,
+                "created_at": msg.created_at.isoformat() if msg.created_at else None
+            } 
+            for msg in history
+        ]
+        return {"user_id": user_id_int, "messages": messages}
     
     except Exception as e:
         error_message = f"Error fetching history: {str(e)}"
@@ -518,6 +556,135 @@ async def get_avatar(user_id: int, db: Session = Depends(get_db)):
         # Return default on error instead of failing
         default_url = f"https://api.dicebear.com/7.x/avataaars/svg?seed=default_{user_id}"
         return {"avatar_url": default_url, "user_id": user_id}
+
+
+# ==================== Pinned Messages Endpoints ====================
+
+@app.post("/pin-message", response_model=PinnedMessageResponse)
+async def pin_message(request: PinMessageRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Pin a message for the current user"""
+    try:
+        logger.info(f"📌 Pinning message {request.chat_history_id} for user: {current_user.id}")
+        
+        # Get the chat message
+        chat_msg = db.query(ChatHistory).filter(ChatHistory.id == request.chat_history_id).first()
+        if not chat_msg:
+            raise HTTPException(status_code=404, detail="Message not found")
+        
+        # Verify message belongs to current user
+        if chat_msg.user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Cannot pin messages from other users")
+        
+        # Check if already pinned
+        existing_pin = db.query(PinnedMessage).filter(
+            PinnedMessage.user_id == current_user.id,
+            PinnedMessage.chat_history_id == request.chat_history_id
+        ).first()
+        
+        if existing_pin:
+            logger.info(f"⚠️ Message already pinned for user: {current_user.id}")
+            return PinnedMessageResponse(
+                id=existing_pin.id,
+                chat_history_id=existing_pin.chat_history_id,
+                message_content=existing_pin.message_content,
+                role=existing_pin.role,
+                conversation_id=existing_pin.conversation_id,
+                pinned_at=existing_pin.pinned_at.isoformat(),
+                pinned_note=existing_pin.pinned_note
+            )
+        
+        # Create new pinned message
+        pinned = PinnedMessage(
+            user_id=current_user.id,
+            chat_history_id=request.chat_history_id,
+            message_content=chat_msg.message,
+            role=chat_msg.role,
+            conversation_id=chat_msg.conversation_id,
+            pinned_note=request.pinned_note
+        )
+        
+        db.add(pinned)
+        db.commit()
+        db.refresh(pinned)
+        
+        logger.info(f"✅ Message pinned successfully for user: {current_user.id}")
+        
+        return PinnedMessageResponse(
+            id=pinned.id,
+            chat_history_id=pinned.chat_history_id,
+            message_content=pinned.message_content,
+            role=pinned.role,
+            conversation_id=pinned.conversation_id,
+            pinned_at=pinned.pinned_at.isoformat(),
+            pinned_note=pinned.pinned_note
+        )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error pinning message: {str(e)}", exc_info=True)
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to pin message: {str(e)}")
+
+
+@app.delete("/pin-message/{message_id}")
+async def unpin_message(message_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Unpin a message for the current user"""
+    try:
+        logger.info(f"📍 Unpinning message {message_id} for user: {current_user.id}")
+        
+        # Find the pinned message
+        pinned = db.query(PinnedMessage).filter(
+            PinnedMessage.id == message_id,
+            PinnedMessage.user_id == current_user.id
+        ).first()
+        
+        if not pinned:
+            raise HTTPException(status_code=404, detail="Pinned message not found")
+        
+        db.delete(pinned)
+        db.commit()
+        
+        logger.info(f"✅ Message unpinned successfully for user: {current_user.id}")
+        return {"status": "unpinned", "message_id": message_id}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error unpinning message: {str(e)}", exc_info=True)
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to unpin message: {str(e)}")
+
+
+@app.get("/pinned-messages", response_model=List[PinnedMessageResponse])
+async def get_pinned_messages(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Get all pinned messages for the current user"""
+    try:
+        logger.info(f"📋 Fetching pinned messages for user: {current_user.id}")
+        
+        pinned_messages = db.query(PinnedMessage)\
+            .filter(PinnedMessage.user_id == current_user.id)\
+            .order_by(PinnedMessage.pinned_at.desc())\
+            .all()
+        
+        logger.info(f"✅ Fetched {len(pinned_messages)} pinned messages for user: {current_user.id}")
+        
+        return [
+            PinnedMessageResponse(
+                id=pm.id,
+                chat_history_id=pm.chat_history_id,
+                message_content=pm.message_content,
+                role=pm.role,
+                conversation_id=pm.conversation_id,
+                pinned_at=pm.pinned_at.isoformat(),
+                pinned_note=pm.pinned_note
+            )
+            for pm in pinned_messages
+        ]
+    
+    except Exception as e:
+        logger.error(f"❌ Error fetching pinned messages: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to fetch pinned messages: {str(e)}")
 
 
 if __name__ == "__main__":

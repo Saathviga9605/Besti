@@ -169,6 +169,64 @@ export const chatAPI = {
       }
     }
   },
+
+  // Pin a message
+  pinMessage: async (authToken, chatHistoryId, pinnedNote = null) => {
+    try {
+      console.log('📌 Pinning message:', chatHistoryId)
+      const response = await api.post(
+        '/pin-message',
+        {
+          chat_history_id: chatHistoryId,
+          pinned_note: pinnedNote,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      )
+      console.log('✅ Message pinned:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('❌ Error pinning message:', error)
+      throw new Error('Failed to pin message: ' + (error.response?.data?.detail || error.message))
+    }
+  },
+
+  // Unpin a message
+  unpinMessage: async (authToken, pinnedMessageId) => {
+    try {
+      console.log('📍 Unpinning message:', pinnedMessageId)
+      const response = await api.delete(`/pin-message/${pinnedMessageId}`, {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      })
+      console.log('✅ Message unpinned:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('❌ Error unpinning message:', error)
+      throw new Error('Failed to unpin message: ' + (error.response?.data?.detail || error.message))
+    }
+  },
+
+  // Get all pinned messages
+  getPinnedMessages: async (authToken) => {
+    try {
+      console.log('📋 Fetching pinned messages')
+      const response = await api.get('/pinned-messages', {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      })
+      console.log('✅ Pinned messages fetched:', response.data.length, 'messages')
+      return response.data || []
+    } catch (error) {
+      console.error('❌ Error fetching pinned messages:', error)
+      return [] // Return empty array on error
+    }
+  },
 }
 
 export default api

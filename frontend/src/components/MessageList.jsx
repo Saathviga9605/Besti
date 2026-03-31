@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react'
 import ChatMessage from './ChatMessage'
 import { motion, AnimatePresence } from 'framer-motion'
 
-const MessageList = ({ messages, aiName, isLoading, error, onEditMessage, onRegenerateMessage }) => {
+const MessageList = ({ messages, aiName, isLoading, error, onEditMessage, onRegenerateMessage, onPinMessage, pinnedMessageIds = [] }) => {
   const endRef = useRef(null)
 
   useEffect(() => {
@@ -51,6 +51,8 @@ const MessageList = ({ messages, aiName, isLoading, error, onEditMessage, onRege
                   messageId={idx}
                   onEdit={onEditMessage}
                   onRegenerate={onRegenerateMessage}
+                  onPin={onPinMessage}
+                  isPinned={pinnedMessageIds && msg.id && pinnedMessageIds.includes(msg.id)}
                   typing_delay={msg.typing_delay || 0}
                 />
               </motion.div>

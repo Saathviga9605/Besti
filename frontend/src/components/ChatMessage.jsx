@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
-const ChatMessage = ({ message, isUser, aiName, timestamp, messageId, onEdit, onRegenerate, typing_delay = 0 }) => {
+const ChatMessage = ({ message, isUser, aiName, timestamp, messageId, onEdit, onRegenerate, onPin, isPinned = false, typing_delay = 0 }) => {
   const [reactions, setReactions] = useState({})
   const [showReactions, setShowReactions] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
@@ -10,6 +10,7 @@ const ChatMessage = ({ message, isUser, aiName, timestamp, messageId, onEdit, on
   const [displayedText, setDisplayedText] = useState(isUser ? message : '')
   const [isTyping, setIsTyping] = useState(!isUser && typing_delay > 0)
   const [wordIndex, setWordIndex] = useState(0)
+  const [pinned, setPinned] = useState(isPinned)
 
   // Handle typing animation for AI messages
   useEffect(() => {
@@ -72,6 +73,13 @@ const ChatMessage = ({ message, isUser, aiName, timestamp, messageId, onEdit, on
   const handleRegenerate = () => {
     if (onRegenerate) {
       onRegenerate(messageId)
+    }
+  }
+
+  const handlePin = () => {
+    if (onPin) {
+      onPin(messageId)
+      setPinned(!pinned)
     }
   }
 
@@ -180,6 +188,17 @@ const ChatMessage = ({ message, isUser, aiName, timestamp, messageId, onEdit, on
                       🔄
                     </button>
                   )}
+                  <button
+                    onClick={handlePin}
+                    className={`p-2 rounded-lg transition flex items-center gap-1 text-xs font-ui whitespace-nowrap ${
+                      pinned
+                        ? 'bg-yellow-500/40 hover:bg-yellow-500/50 text-yellow-200 hover:text-yellow-100'
+                        : 'bg-purple-500/20 hover:bg-purple-500/40 text-purple-300 hover:text-purple-200'
+                    }`}
+                    title={pinned ? 'Unpin message' : 'Pin message'}
+                  >
+                    {pinned ? '📌' : '📍'}
+                  </button>
                 </motion.div>
               )}
             </AnimatePresence>
