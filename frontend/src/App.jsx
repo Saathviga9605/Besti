@@ -5,6 +5,7 @@ import Sidebar from './components/Sidebar'
 import MessageList from './components/MessageList'
 import ChatInput from './components/ChatInput'
 import PersonalityModal from './components/PersonalityModal'
+import AvatarPicker from './components/AvatarPicker'
 import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
 
@@ -49,6 +50,8 @@ function App() {
       response_style: 'Medium',
     },
   })
+  const [avatarUrl, setAvatarUrl] = useState(null)
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false)
 
   // Check authentication on mount
   useEffect(() => {
@@ -82,6 +85,10 @@ function App() {
       try {
         const prefs = await chatAPI.getPreferences(userId)
         setPreferences(prefs)
+
+        // Load avatar
+        const avatar = await chatAPI.getAvatar(userId)
+        setAvatarUrl(avatar.avatar_url)
 
         const history = await chatAPI.getHistory(userId)
 
@@ -206,6 +213,19 @@ function App() {
     setAuthPage('login')
   }
 
+  // Handle avatar generation
+  const handleGenerateNewAvatar = async () => {
+    if (!userId) return
+    try {
+      const result = await chatAPI.generateAvatar(userId)
+      setAvatarUrl(result.avatar_url)
+      setShowAvatarPicker(false)
+    } catch (error) {
+      console.error('Error generating avatar:', error)
+      setError('Failed to generate avatar')
+    }
+  }
+
   // Show loading state while checking auth
   if (isCheckingAuth) {
     return (
@@ -265,8 +285,17 @@ function App() {
               <div className="flex items-end justify-between gap-4">
                 <div className="flex items-center gap-4">
                   {/* Avatar */}
-                  <div className="avatar-ai">
-                    {preferences.ai_name.charAt(0)}
+                  <div 
+                    className="avatar-header-image cursor-pointer"
+                    onClick={() => setShowAvatarPicker(true)}
+                  >
+                    {avatarUrl ? (
+                      <img src={avatarUrl} alt="Avatar" />
+                    ) : (
+                      <div className="avatar-header-image-placeholder">
+                        {preferences.ai_name.charAt(0)}
+                      </div>
+                    )}
                   </div>
                   <div>
                     <h1 className="font-display text-3xl text-white leading-tight">
@@ -338,6 +367,15 @@ function App() {
         onSave={handleSavePreferences}
         currentPreferences={preferences}
       />
+
+      {/* Avatar Picker Modal */}
+      {showAvatarPicker && (
+        <AvatarPicker
+          avatarUrl={avatarUrl}
+          onGenerateNew={handleGenerateNewAvatar}
+          onClose={() => setShowAvatarPicker(false)}
+        />
+      )}
     </div>
   )
 }

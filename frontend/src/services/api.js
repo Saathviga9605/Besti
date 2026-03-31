@@ -134,6 +134,40 @@ export const chatAPI = {
       }
     }
   },
+
+  // Generate a new avatar for user
+  generateAvatar: async (userId) => {
+    try {
+      console.log('🎨 Generating avatar for user:', userId)
+      const response = await api.post(`/avatar/generate`, null, {
+        params: {
+          user_id: userId,
+        },
+      })
+      console.log('✅ Avatar generated:', response.data.avatar_url)
+      return response.data
+    } catch (error) {
+      console.error('❌ Error generating avatar:', error)
+      throw new Error('Failed to generate avatar: ' + (error.response?.data?.detail || error.message))
+    }
+  },
+
+  // Get user's avatar
+  getAvatar: async (userId) => {
+    try {
+      console.log('🖼️ Fetching avatar for user:', userId)
+      const response = await api.get(`/avatar/${userId}`)
+      console.log('✅ Avatar fetched:', response.data.avatar_url)
+      return response.data
+    } catch (error) {
+      console.error('❌ Error fetching avatar:', error)
+      // Return default avatar if error
+      return {
+        avatar_url: `https://api.dicebear.com/7.x/avataaars/svg?seed=default_${userId}`,
+        user_id: userId,
+      }
+    }
+  },
 }
 
 export default api

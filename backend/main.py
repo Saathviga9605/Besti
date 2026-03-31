@@ -3,12 +3,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
 import logging
+import secrets
 from typing import Dict, List, Optional
 from pydantic import BaseModel
 from models import ChatRequest, ChatResponse, Message, PersonalityConfig
 from services import llm_service
 from database import init_db, get_db, SessionLocal
-from orm import User
+from orm import User, Avatar
 from auth import hash_password, verify_password, create_access_token, verify_token
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -149,8 +150,8 @@ async def signup(request: SignupRequest, db: Session = Depends(get_db)):
         db.refresh(user)
         logger.info(f"User created successfully: {user.id}")
         
-        # Create access token
-        access_token = create_access_token(data={"sub": user.id})
+        # Create access token (sub must be string)
+        access_token = create_access_token(data={"sub": str(user.id)})
         
         return AuthResponse(
             access_token=access_token,
@@ -189,8 +190,8 @@ async def login(request: LoginRequest, db: Session = Depends(get_db)):
         
         logger.info(f"User logged in successfully: {user.id}")
         
-        # Create access token
-        access_token = create_access_token(data={"sub": user.id})
+        # Create access token (sub must be string)
+        access_token = create_access_token(data={"sub": str(user.id)})
         
         return AuthResponse(
             access_token=access_token,
@@ -381,6 +382,83 @@ async def get_preferences(user_id: str):
         error_message = f"Error fetching preferences: {str(e)}"
         logger.error(error_message)
         raise HTTPException(status_code=500, detail=error_message)
+
+
+# ==================== Avatar Endpoints ====================
+
+@app.post("/avatar/generate")
+async def generate_avatar(user_id: int, seed: str = None, db: Session = Depends(get_db)):
+    """Generate a random avatar using DiceBear and save it"""
+    try:
+        logger.info(f"🎨 Generating avatar for user: {user_id}")
+        
+        # Verify user exists
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            logger.error(f"❌ User not found: {user_id}")
+            raise HTTPException(status_code=404, detail=f"User {user_id} not found")
+        
+        logger.info(f"✅ User found: {user.username}")
+        
+        # Generate DiceBear URL
+        avatar_seed = seed or f"{user.username}_{secrets.token_hex(4)}"
+        avatar_url = f"https://api.dicebear.com/7.x/avataaars/svg?seed={avatar_seed}"
+        
+        logger.info(f"🌐 Generated DiceBear URL: {avatar_url}")
+        
+        # Check if avatar exists for user
+        existing_avatar = db.query(Avatar).filter(Avatar.user_id == user_id).first()
+        
+        if existing_avatar:
+            logger.info(f"📝 Updating existing avatar for user: {user_id}")
+            existing_avatar.image_url = avatar_url
+            existing_avatar.image_type = "generated"
+            db.commit()
+            logger.info(f"✅ Avatar updated for user: {user_id}")
+        else:
+            logger.info(f"➕ Creating new avatar for user: {user_id}")
+            # Create new avatar
+            avatar = Avatar(
+                user_id=user_id,
+                image_url=avatar_url,
+                image_type="generated"
+            )
+            db.add(avatar)
+            db.commit()
+            logger.info(f"✅ Avatar created for user: {user_id}")
+        
+        logger.info(f"🎉 Avatar generation successful for user: {user_id}")
+        return {"avatar_url": avatar_url, "user_id": user_id, "status": "success"}
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Avatar generation error for user {user_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Avatar generation failed: {str(e)}")
+
+
+@app.get("/avatar/{user_id}")
+async def get_avatar(user_id: int, db: Session = Depends(get_db)):
+    """Get user's avatar"""
+    try:
+        logger.info(f"🖼️ Fetching avatar for user: {user_id}")
+        
+        avatar = db.query(Avatar).filter(Avatar.user_id == user_id).first()
+        
+        if not avatar or not avatar.image_url:
+            logger.info(f"📭 No avatar found for user {user_id}, generating default")
+            # Return default avatar if none exists
+            default_url = f"https://api.dicebear.com/7.x/avataaars/svg?seed=default_{user_id}"
+            return {"avatar_url": default_url, "user_id": user_id}
+        
+        logger.info(f"✅ Avatar fetched for user: {user_id}")
+        return {"avatar_url": avatar.image_url, "user_id": user_id}
+    
+    except Exception as e:
+        logger.error(f"❌ Error fetching avatar for user {user_id}: {str(e)}", exc_info=True)
+        # Return default on error instead of failing
+        default_url = f"https://api.dicebear.com/7.x/avataaars/svg?seed=default_{user_id}"
+        return {"avatar_url": default_url, "user_id": user_id}
 
 
 if __name__ == "__main__":
