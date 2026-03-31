@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import useStore from '../store/useStore'
 
-const Sidebar = ({ conversations, activeConversationId, onNewChat, onExportChat, onSelectChat, onOpenSettings, username, onLogout, pinnedMessages = [], onSelectPinnedMessage }) => {
+const Sidebar = ({ conversations, activeConversationId, onNewChat, onExportChat, onOpenMemoryView, onOpenChatView, isMemoryViewActive = false, onSelectChat, onOpenSettings, username, onLogout, pinnedMessages = [], onSelectPinnedMessage }) => {
   const { sidebarExpanded, toggleSidebar } = useStore()
   const streak = localStorage.getItem('besti_streak') || '0'
   const [showExportPicker, setShowExportPicker] = useState(false)
@@ -43,6 +43,23 @@ const Sidebar = ({ conversations, activeConversationId, onNewChat, onExportChat,
       </motion.button>
 
       <div className="mx-4 mb-4">
+        <div className="flex gap-2 mb-2">
+          <button
+            onClick={onOpenChatView}
+            className={`flex-1 px-3 py-2 text-xs rounded-md transition border ${!isMemoryViewActive ? 'bg-white/12 text-white border-white/20' : 'bg-white/5 text-text-ghost border-white/10 hover:bg-white/8'}`}
+            type="button"
+          >
+            Chat
+          </button>
+          <button
+            onClick={onOpenMemoryView}
+            className={`flex-1 px-3 py-2 text-xs rounded-md transition border ${isMemoryViewActive ? 'bg-white/12 text-white border-white/20' : 'bg-white/5 text-text-ghost border-white/10 hover:bg-white/8'}`}
+            type="button"
+          >
+            Memory View
+          </button>
+        </div>
+
         <motion.button
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}

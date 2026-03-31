@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from models import ChatRequest, ChatResponse, Message, PersonalityConfig
 from services import llm_service
 from database import init_db, get_db, SessionLocal
-from orm import User, Avatar, ChatHistory, PinnedMessage, Personality
+from orm import User, Avatar, ChatHistory, PinnedMessage, Personality, Memory
 from auth import hash_password, verify_password, create_access_token, verify_token
 from sqlalchemy.orm import Session
 from sqlalchemy import select
@@ -96,6 +96,20 @@ class PinnedMessageResponse(BaseModel):
     conversation_id: str
     pinned_at: str
     pinned_note: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class MemoryResponse(BaseModel):
+    """Response model for user memories"""
+    id: int
+    content: str
+    raw_category: str
+    category: str
+    frequency: int
+    created_at: str
+    last_accessed: str
 
     class Config:
         from_attributes = True
@@ -746,6 +760,44 @@ async def get_pinned_messages(current_user: User = Depends(get_current_user), db
     except Exception as e:
         logger.error(f"❌ Error fetching pinned messages: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to fetch pinned messages: {str(e)}")
+
+
+@app.get("/memories", response_model=List[MemoryResponse])
+async def get_memories(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Return stored long-term memories for the current user"""
+    try:
+        logger.info(f"🧠 Fetching memories for user: {current_user.id}")
+
+        memory_rows = db.query(Memory)\
+            .filter(Memory.user_id == current_user.id)\
+            .order_by(Memory.last_accessed.desc(), Memory.created_at.desc())\
+            .all()
+
+        category_map = {
+            "preference": "Likes",
+            "interest": "Likes",
+            "event": "Important moments",
+            "emotion": "Emotional states",
+        }
+
+        result = [
+            MemoryResponse(
+                id=row.id,
+                content=row.fact,
+                raw_category=row.category,
+                category=category_map.get((row.category or "").lower(), "Important moments"),
+                frequency=row.frequency or 1,
+                created_at=row.created_at.isoformat() if row.created_at else datetime.now(timezone.utc).isoformat(),
+                last_accessed=row.last_accessed.isoformat() if row.last_accessed else datetime.now(timezone.utc).isoformat(),
+            )
+            for row in memory_rows
+        ]
+
+        logger.info(f"✅ Returned {len(result)} memories for user: {current_user.id}")
+        return result
+    except Exception as e:
+        logger.error(f"❌ Error fetching memories: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to fetch memories: {str(e)}")
 
 
 if __name__ == "__main__":

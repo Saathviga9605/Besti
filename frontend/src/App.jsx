@@ -8,6 +8,7 @@ import PersonalityModal from './components/PersonalityModal'
 import AvatarPicker from './components/AvatarPicker'
 import LoginPage from './pages/LoginPage'
 import SignupPage from './pages/SignupPage'
+import MemoryViewPage from './pages/MemoryViewPage'
 
 function App() {
   // Zustand state - Authentication
@@ -57,6 +58,9 @@ function App() {
   const [avatarUrl, setAvatarUrl] = useState(null)
   const [showAvatarPicker, setShowAvatarPicker] = useState(false)
   const [pinnedMessageIds, setPinnedMessageIds] = useState([])
+  const [activeView, setActiveView] = useState('chat')
+  const [memories, setMemories] = useState([])
+  const [isLoadingMemories, setIsLoadingMemories] = useState(false)
 
   const downloadFile = (content, filename, mimeType) => {
     const blob = new Blob([content], { type: mimeType })
@@ -189,6 +193,12 @@ function App() {
         setPinnedMessages(pinned)
         console.log('📌 Loaded pinned messages:', pinned.length)
 
+        // Load long-term memories
+        setIsLoadingMemories(true)
+        const memoryItems = await chatAPI.getMemories(authToken)
+        setMemories(memoryItems)
+        console.log('🧠 Loaded memories:', memoryItems.length)
+
         const history = await chatAPI.getHistory(userId)
 
         if (history && history.length > 0) {
@@ -204,6 +214,8 @@ function App() {
         }
       } catch (error) {
         console.error('Error loading initial data:', error)
+      } finally {
+        setIsLoadingMemories(false)
       }
     }
 
@@ -462,6 +474,27 @@ function App() {
     setError(`Viewing pinned message: ${pinnedMsg.message_content?.substring(0, 30)}...`)
   }
 
+  const handleOpenMemoryView = async () => {
+    setActiveView('memory')
+    setError(null)
+    setIsLoadingMemories(true)
+
+    try {
+      const memoryItems = await chatAPI.getMemories(authToken)
+      setMemories(memoryItems)
+    } catch (e) {
+      console.error('Error loading memories:', e)
+      setError('Failed to load memories')
+    } finally {
+      setIsLoadingMemories(false)
+    }
+  }
+
+  const handleOpenChatView = () => {
+    setActiveView('chat')
+    setError(null)
+  }
+
   // Handle new chat
   const handleNewChat = () => {
     const newChat = {
@@ -504,6 +537,8 @@ function App() {
     localStorage.removeItem('username')
     logout()
     setAuthPage('login')
+    setActiveView('chat')
+    setMemories([])
   }
 
   // Handle avatar generation
@@ -564,6 +599,9 @@ function App() {
         activeConversationId={activeConversationId}
         onNewChat={handleNewChat}
         onExportChat={handleExportChat}
+        onOpenMemoryView={handleOpenMemoryView}
+        onOpenChatView={handleOpenChatView}
+        isMemoryViewActive={activeView === 'memory'}
         onSelectChat={handleSelectChat}
         onOpenSettings={() => setSettingsOpen(true)}
         username={username}
@@ -574,7 +612,9 @@ function App() {
 
       {/* Chat Shell - The Stage */}
       <div className="chat-shell">
-        {currentChat ? (
+        {activeView === 'memory' ? (
+          <MemoryViewPage memories={memories} isLoading={isLoadingMemories} />
+        ) : currentChat ? (
           <>
             {/* Header */}
             <div className="chat-header px-8 py-6 border-b border-white/10">

@@ -227,6 +227,23 @@ export const chatAPI = {
       return [] // Return empty array on error
     }
   },
+
+  // Get stored long-term memories
+  getMemories: async (authToken) => {
+    try {
+      console.log('🧠 Fetching memories')
+      const response = await api.get('/memories', {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      })
+      console.log('✅ Memories fetched:', response.data.length, 'items')
+      return response.data || []
+    } catch (error) {
+      console.error('❌ Error fetching memories:', error)
+      return []
+    }
+  },
 }
 
 export default api

@@ -437,6 +437,128 @@ body {
 }
 
 /* ========================================
+   MEMORY VIEW PAGE
+   ======================================== */
+
+.memory-page-shell {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 2rem;
+  position: relative;
+  z-index: 2;
+}
+
+.memory-page-header {
+  margin-bottom: 1rem;
+}
+
+.memory-title {
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  color: var(--text-soul);
+  line-height: 1.1;
+}
+
+.memory-subtitle {
+  margin-top: 0.5rem;
+  color: var(--text-ghost);
+  max-width: 56ch;
+}
+
+.memory-scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.memory-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
+  padding-bottom: 1rem;
+}
+
+.memory-card {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px;
+  backdrop-filter: blur(12px);
+  padding: 1rem;
+  min-height: 220px;
+}
+
+.memory-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.memory-card-header h2 {
+  font-family: 'Geist', sans-serif;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-soul);
+}
+
+.memory-card-header span {
+  font-family: 'Geist Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--text-ghost);
+}
+
+.memory-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.memory-item {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 12px;
+  padding: 0.75rem;
+}
+
+.memory-content {
+  color: var(--text-soul);
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.memory-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  color: var(--text-ghost);
+  font-size: 0.75rem;
+  font-family: 'Geist', sans-serif;
+}
+
+.memory-empty,
+.memory-card-empty {
+  color: var(--text-ghost);
+  font-family: 'Geist', sans-serif;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 1024px) {
+  .memory-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .memory-page-shell {
+    padding: 1rem;
+  }
+}
+
+/* ========================================
    AVATAR SYSTEM
    ======================================== */
 
