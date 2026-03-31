@@ -52,7 +52,7 @@ const MessageList = ({ messages, aiName, isLoading, error, onEditMessage, onRege
                   onEdit={onEditMessage}
                   onRegenerate={onRegenerateMessage}
                   onPin={onPinMessage}
-                  isPinned={pinnedMessageIds && msg.id && pinnedMessageIds.includes(msg.id)}
+                  isPinned={pinnedMessageIds && pinnedMessageIds.includes(idx)}
                   typing_delay={msg.typing_delay || 0}
                 />
               </motion.div>

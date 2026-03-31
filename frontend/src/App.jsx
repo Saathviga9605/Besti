@@ -177,10 +177,9 @@ function App() {
       }
 
       // Add user message to local state immediately (visual feedback)
-      // Don't add ID yet - will be added when response comes back
       const newMessages = messageId !== null 
         ? currentMessages 
-        : [...currentMessages, { role: 'user', content: message, id: null }]
+        : [...currentMessages, { role: 'user', content: message }]
       setCurrentMessages(newMessages)
       setTyping(true)
 
@@ -205,31 +204,17 @@ function App() {
         console.log('😊 Emotion detected:', response.emotion, response.emotion_intensity)
       }
 
-      // Build messages with AI response (include typing_delay for animation and IDs for pinning)
-      if (!response.message_id || !response.response_message_id) {
-        console.warn('⚠️ WARNING: Backend did not return message IDs!', { 
-          message_id: response.message_id, 
-          response_message_id: response.response_message_id,
-          apiResponse: response 
-        })
-      }
-      
+      // Build messages with AI response (include typing_delay for animation)
       const messagesWithResponse = [
-        ...newMessages.slice(0, -1), // Previous messages
-        { 
-          role: 'user', 
-          content: message,
-          id: response.message_id  // Store the user message ID from backend
-        },
+        ...newMessages,
         { 
           role: 'assistant', 
           content: response.response,
-          id: response.response_message_id,  // Store the assistant message ID from backend
           typing_delay: response.typing_delay || 0
         },
       ]
       
-      console.log('📝 Updated messages with IDs:', messagesWithResponse.map(m => ({ role: m.role, has_id: !!m.id, id: m.id })))
+      console.log('📝 Updated messages, count:', messagesWithResponse.length)
       setCurrentMessages(messagesWithResponse)
 
       // Update the conversation with new messages
@@ -336,24 +321,7 @@ function App() {
     console.log(`📌 Pin/Unpin message at index ${messageIdx}`)
     
     try {
-      const message = currentMessages[messageIdx]
-      if (!message) {
-        console.warn('⚠️ Message not found at index:', messageIdx)
-        setError('Cannot pin this message - message not found')
-        return
-      }
-      
-      if (!message.id) {
-        console.error('❌ Message ID missing:', { 
-          messageIdx, 
-          message: message,
-          allMessages: currentMessages.map((m, i) => ({index: i, role: m.role, id: m.id}))
-        })
-        setError('⚠️ Cannot pin this message - missing database ID. Try sending a new message and pinning that instead.')
-        return
-      }
-      
-      const messageId = message.id
+      const messageId = messageIdx // For now, using the index as message ID
       const isCurrentlyPinned = pinnedMessageIds.includes(messageId)
       
       if (isCurrentlyPinned) {
@@ -366,7 +334,19 @@ function App() {
           console.log('✅ Message unpinned')
         }
       } else {
-        // Pin logic
+        // Pin logic - we need the actual chat_history_id from the backend
+        // For now, we'll use a generated ID
+        const newPinned = {
+          id: Date.now(), // Temporary ID until we get it from backend
+          chat_history_id: messageId,
+          message_content: currentMessages[messageIdx]?.content || '',
+          role: currentMessages[messageIdx]?.role || 'user',
+          conversation_id: activeConversationId || 'main',
+          pinned_at: new Date().toISOString(),
+          pinned_note: null,
+        }
+        
+        // Call backend to pin
         try {
           const result = await chatAPI.pinMessage(authToken, messageId)
           addPinnedMessage(result)
@@ -374,7 +354,7 @@ function App() {
           console.log('✅ Message pinned:', result)
         } catch (err) {
           console.error('Error pinning message:', err)
-          setError('Failed to pin message: ' + err.message)
+          setError('Failed to pin message')
         }
       }
     } catch (error) {

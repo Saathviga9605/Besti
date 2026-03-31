@@ -325,10 +325,6 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
         )
         logger.info(f"✅ LLM response generated (length: {len(ai_response)})")
         
-        # Initialize message IDs (will be populated if DB save succeeds)
-        user_message_id = None
-        ai_message_id = None
-        
         # Save user message to database
         try:
             user_chat_msg = ChatHistory(
@@ -349,14 +345,12 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
                 message=ai_response
             )
             db.add(ai_chat_msg)
-            db.flush()  # Get the AI message ID
-            ai_message_id = ai_chat_msg.id
             db.commit()
-            logger.info(f"✅ Messages saved to database (user_msg_id: {user_message_id}, ai_msg_id: {ai_message_id})")
+            logger.info(f"✅ Messages saved to database (user_msg_id: {user_message_id})")
         except Exception as e:
             logger.error(f"⚠️ Error saving chat history: {e}")
             db.rollback()
-            logger.warning(f"⚠️ Messages not saved to database - pinning may not work for this message")
+            # Continue anyway - don't fail the response
         
         # Calculate typing delay based on response length
         # Simulate realistic typing speed: ~100ms per word + 500ms base
@@ -367,8 +361,7 @@ async def chat(request: ChatRequest, db: Session = Depends(get_db)):
         response = ChatResponse(
             response=ai_response, 
             ai_name=ai_name,
-            message_id=user_message_id,  # Will be None if DB save failed
-            response_message_id=ai_message_id,  # Will be None if DB save failed
+            message_id=user_message_id if 'user_message_id' in locals() else None,
             typing_delay=typing_delay
         )
         logger.info(f"✅ Response sent to user: {user_id}")
@@ -409,31 +402,16 @@ async def set_preferences(user_id: str, ai_name: str = "Luna", personality: Pers
 
 
 @app.get("/history/{user_id}")
-async def get_history(user_id: str, db: Session = Depends(get_db)):
-    """Get chat history for a user from database"""
+async def get_history(user_id: str):
+    """Get chat history for a user"""
     
     try:
-        user_id_int = int(user_id) if isinstance(user_id, str) else user_id
-        logger.info(f"Getting history for user: {user_id_int}")
+        logger.info(f"Getting history for user: {user_id}")
         
-        # Fetch from database
-        history = db.query(ChatHistory)\
-            .filter(ChatHistory.user_id == user_id_int)\
-            .order_by(ChatHistory.created_at.asc())\
-            .all()
-        
-        # Return with message IDs for pinning
-        messages = [
-            {
-                "id": msg.id,
-                "role": msg.role,
-                "content": msg.message,
-                "conversation_id": msg.conversation_id,
-                "created_at": msg.created_at.isoformat() if msg.created_at else None
-            } 
-            for msg in history
-        ]
-        return {"user_id": user_id_int, "messages": messages}
+        # Convert to string for dict key consistency
+        user_id_str = str(user_id)
+        history = chat_histories.get(user_id_str, [])
+        return {"user_id": user_id_str, "messages": [{"role": msg.role, "content": msg.content} for msg in history]}
     
     except Exception as e:
         error_message = f"Error fetching history: {str(e)}"
